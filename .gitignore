@@ -1,24 +1,30 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 .pnp
 .pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
 
-# Production Builds
+# Production Builds & Outputs
 dist/
+dist-ssr/
 build/
-.next/
 out/
+.next/
+*.tsbuildinfo
+next-env.d.ts
 
-# Environment Variables
+# Environment Variables & Sensitive Keys
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env*.local
+.env.*
 !.env.example
+*.pem
+*.key
+*.cert
 
-# Logs
+# Logs & Diagnostics
 logs
 *.log
 npm-debug.log*
@@ -32,20 +38,34 @@ coverage/
 *.lcov
 .nyc_output
 
-# Editor & OS Metadata
-.DS_Store
-Thumbs.db
+# Editor & IDE Metadata
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-.idea/
-.vscode/*
-!.vscode/extensions.json
+*.sublime-workspace
+*.sublime-project
 
-# Cache & Diagnostics
+# OS Metadata & System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+*.stackdump
+
+# Caches
+.cache/
 .turbo/
 .vercel/
-*.tsbuildinfo
-next-env.d.ts
+.parcel-cache/
