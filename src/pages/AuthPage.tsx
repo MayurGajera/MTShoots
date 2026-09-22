@@ -48,7 +48,7 @@ export const AuthPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [city, setCity] = useState('Mumbai');
+  const [city, setCity] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(PRESET_AVATARS[0]);
 
   // Forgot Password / OTP Flow States
@@ -366,10 +366,7 @@ export const AuthPage: React.FC = () => {
                         type="password"
                         value={resetPassword}
                         onChange={(e) => setResetPassword(e.target.value)}
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
-                      />
+                        placeholder="Enter password" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-[#181615] mb-1.5">Confirm New Password</label>
@@ -377,10 +374,7 @@ export const AuthPage: React.FC = () => {
                         type="password"
                         value={resetConfirmPassword}
                         onChange={(e) => setResetConfirmPassword(e.target.value)}
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
-                      />
+                        placeholder="Enter password" />
                     </div>
                     <button
                       type="submit"
@@ -598,10 +592,7 @@ export const AuthPage: React.FC = () => {
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
-                      />
+                        placeholder="Enter password" />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
@@ -621,10 +612,7 @@ export const AuthPage: React.FC = () => {
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
-                      />
+                        placeholder="Enter password" />
                     </div>
                   )}
 

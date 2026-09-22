@@ -94,49 +94,44 @@ export const PhotographerApplyPage: React.FC = () => {
     'Bridal Portraits',
     'Candid Moments'
   ]);
-  const [cameraBodies, setCameraBodies] = useState('Sony A7 IV, Sony A7R V');
-  const [lenses, setLenses] = useState('24-70mm f/2.8 GM II, 85mm f/1.4 GM, 35mm f/1.4 GM');
-  const [lighting, setLighting] = useState('Godox AD400 Pro, Godox V1 Speedlights with softboxes');
+  const [cameraBodies, setCameraBodies] = useState('');
+  const [lenses, setLenses] = useState('');
+  const [lighting, setLighting] = useState('');
   const [droneGear, setDroneGear] = useState('DJI Mavic 3 Pro (DGCA Certified Pilot)');
 
   // Step 3: Packages & Rates
-  const [standardTitle, setStandardTitle] = useState('Full-Day Wedding & Reception');
+  const [standardTitle, setStandardTitle] = useState('');
   const [standardRate, setStandardRate] = useState(65000);
   const [standardHours, setStandardHours] = useState(8);
-  const [standardDeliverables, setStandardDeliverables] = useState('350+ edited photos, 1 teaser video, online gallery');
+  const [standardDeliverables, setStandardDeliverables] = useState('');
   const [turnaroundDays, setTurnaroundDays] = useState(4);
 
   // Step 4: Visual Showcase & Multiple Photos
-  const [portfolioPhotos, setPortfolioPhotos] = useState<UploadedPhoto[]>([
-    {
-      id: 'photo-1',
-      url: SAMPLE_PORTFOLIO_POOL[0],
-      caption: 'Heritage Palaces & Royal Bridal Entry',
-      tag: 'Wedding',
-      isCover: true,
-    },
-    {
-      id: 'photo-2',
-      url: SAMPLE_PORTFOLIO_POOL[1],
-      caption: 'Golden Hour Sunset Couple Portraits in Goa',
-      tag: 'Pre-Wedding',
-      isCover: false,
-    },
-    {
-      id: 'photo-3',
-      url: SAMPLE_PORTFOLIO_POOL[2],
-      caption: 'Regal Varmala Exchange under Floral Chhatri',
-      tag: 'Ceremony',
-      isCover: false,
-    },
-    {
-      id: 'photo-4',
-      url: SAMPLE_PORTFOLIO_POOL[3],
-      caption: 'Editorial Bridal Jewellery & Lehanga Details',
-      tag: 'Details',
-      isCover: false,
-    }
-  ]);
+  const [portfolioPhotos, setPortfolioPhotos] = useState<UploadedPhoto[]>([]);
+
+  const handlePortfolioFilesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          const cleanCaption = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+          setPortfolioPhotos(prev => [
+            ...prev,
+            {
+              id: 'photo-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+              url: reader.result as string,
+              caption: cleanCaption || 'Portfolio Photo',
+              tag: primaryGenre,
+              isCover: prev.length === 0 && index === 0,
+            }
+          ]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [newPhotoCaption, setNewPhotoCaption] = useState('');
 
@@ -506,7 +501,7 @@ export const PhotographerApplyPage: React.FC = () => {
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
               <div>
                 <h2 className="font-serif text-2xl font-bold text-[#181615]">Step 3: Service Packages & Rates</h2>
-                <p className="text-xs text-[#8a726a] mt-1">Define transparent packages in Indian Rupees (₹ INR).</p>
+                <p className="text-xs text-[#8a726a] mt-1">Define transparent packages in Indian Rupees (Rs. INR).</p>
               </div>
 
               <div className="p-5 rounded-2xl bg-[#FAF8F5] border border-[#E7E1DA] space-y-4">
@@ -551,95 +546,123 @@ export const PhotographerApplyPage: React.FC = () => {
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
               <div>
                 <h2 className="font-serif text-2xl font-bold text-[#181615]">Step 4: Portfolio Showcase (Multiple Photos)</h2>
-                <p className="text-xs text-[#8a726a] mt-1">Upload high-definition photos that will be displayed in your public portfolio gallery.</p>
+                <p className="text-xs text-[#8a726a] mt-1">Upload high-definition photos from your device to display in your public portfolio.</p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#E7E1DA] space-y-3">
-                <div className="text-xs font-bold text-[#181615]">Add New Portfolio Photo</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input
-                    value={newPhotoUrl}
-                    onChange={(e) => setNewPhotoUrl(e.target.value)}
-                    placeholder="Paste image URL (https://...)"
+              {/* Direct File Upload Dropzone */}
+              <div className="p-5 rounded-2xl bg-[#FAF8F5] border border-[#E7E1DA] space-y-4">
+                <div className="text-xs font-bold text-[#181615]">Upload Photos from Your Device</div>
+                
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-[#C85A32]/40 hover:border-[#C85A32] bg-white hover:bg-[#FFF8F5] rounded-2xl p-6 sm:p-8 transition-all cursor-pointer group text-center shadow-xs">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePortfolioFilesUpload}
+                    className="hidden"
                   />
-                  <Input
-                    value={newPhotoCaption}
-                    onChange={(e) => setNewPhotoCaption(e.target.value)}
-                    placeholder="Short description / title"
-                  />
-                </div>
-                <div className="flex justify-between items-center pt-2">
-                  <div className="text-[11px] text-[#8a726a]">
-                    Or quick add sample:
-                    <button
-                      type="button"
-                      onClick={() => setNewPhotoUrl(SAMPLE_PORTFOLIO_POOL[Math.floor(Math.random() * SAMPLE_PORTFOLIO_POOL.length)])}
-                      className="ml-2 text-[#C85A32] font-semibold underline cursor-pointer"
-                    >
-                      Fill Sample Image
-                    </button>
+                  <div className="w-12 h-12 rounded-full bg-[#C85A32]/10 group-hover:bg-[#C85A32]/20 flex items-center justify-center text-[#C85A32] mb-3 transition-colors">
+                    <Upload className="w-6 h-6" />
                   </div>
-                  <Button
-                    onClick={handleAddPhoto}
-                    disabled={!newPhotoUrl.trim()}
-                    className="bg-[#181615] hover:bg-[#C85A32] text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add to Gallery</span>
-                  </Button>
+                  <span className="text-xs sm:text-sm font-bold text-[#181615]">
+                    Click to select photos from device or drag & drop
+                  </span>
+                  <span className="text-[11px] text-[#8a726a] mt-1">
+                    Select multiple JPG, PNG, or WebP images (Up to 15MB each)
+                  </span>
+                </label>
+
+                {/* Optional URL addition */}
+                <div className="pt-2 border-t border-[#E7E1DA]/80">
+                  <div className="text-[11px] font-semibold text-[#8a726a] mb-2">Or add photo by image URL:</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      value={newPhotoUrl}
+                      onChange={(e) => setNewPhotoUrl(e.target.value)}
+                      placeholder="Image link (https://...)"
+                    />
+                    <div className="flex gap-2">
+                      <Input
+                        value={newPhotoCaption}
+                        onChange={(e) => setNewPhotoCaption(e.target.value)}
+                        placeholder="Short title"
+                      />
+                      <Button
+                        onClick={handleAddPhoto}
+                        disabled={!newPhotoUrl.trim()}
+                        className="bg-[#181615] hover:bg-[#C85A32] text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
+              {/* Current Portfolio Photos List */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-xs font-bold text-[#181615]">
-                    Current Portfolio Photos ({portfolioPhotos.length})
+                    Uploaded Photos ({portfolioPhotos.length})
                   </div>
-                  <div className="text-[11px] text-[#8a726a]">
-                    Click star to mark as Main Cover Photo
-                  </div>
+                  {portfolioPhotos.length > 0 && (
+                    <div className="text-[11px] text-[#8a726a]">
+                      Click star to set as main cover
+                    </div>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {portfolioPhotos.map((photo) => (
-                    <div
-                      key={photo.id}
-                      className={`group relative rounded-xl overflow-hidden border-2 transition-all bg-[#181615] aspect-4/3 ${
-                        photo.isCover ? 'border-[#C85A32] ring-2 ring-[#C85A32]/30' : 'border-[#E7E1DA]'
-                      }`}
-                    >
-                      <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-between">
-                        <div className="flex justify-between items-center">
-                          <button
-                            type="button"
-                            onClick={() => handleSetCover(photo.id)}
-                            className={`p-1 rounded-full text-xs font-bold cursor-pointer transition-colors ${
-                              photo.isCover ? 'bg-[#C85A32] text-white' : 'bg-white/80 hover:bg-white text-[#181615]'
-                            }`}
-                            title="Set as Main Cover"
-                          >
-                            <Star className="w-3.5 h-3.5 fill-current" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePhoto(photo.id)}
-                            className="p-1 rounded-full bg-red-600/90 hover:bg-red-600 text-white cursor-pointer"
-                            title="Delete Photo"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                {portfolioPhotos.length === 0 ? (
+                  <div className="p-8 rounded-2xl bg-white border border-dashed border-[#E7E1DA] text-center space-y-2">
+                    <ImageIcon className="w-8 h-8 text-[#8a726a]/40 mx-auto" />
+                    <p className="text-xs font-medium text-[#8a726a]">No photos uploaded yet.</p>
+                    <p className="text-[11px] text-[#8a726a]/80">Upload photos above to showcase your photography to clients.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {portfolioPhotos.map((photo) => (
+                      <div
+                        key={photo.id}
+                        className={`group relative rounded-xl overflow-hidden border-2 transition-all bg-[#181615] aspect-4/3 ${
+                          photo.isCover ? 'border-[#C85A32] ring-2 ring-[#C85A32]/30' : 'border-[#E7E1DA]'
+                        }`}
+                      >
+                        <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-between">
+                          <div className="flex justify-between items-center">
+                            <button
+                              type="button"
+                              onClick={() => handleSetCover(photo.id)}
+                              className={`p-1 rounded-full text-xs font-bold cursor-pointer transition-colors ${
+                                photo.isCover ? 'bg-[#C85A32] text-white' : 'bg-white/80 hover:bg-white text-[#181615]'
+                              }`}
+                              title="Set as Main Cover"
+                            >
+                              <Star className="w-3.5 h-3.5 fill-current" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePhoto(photo.id)}
+                              className="p-1 rounded-full bg-red-600/80 hover:bg-red-600 text-white text-xs cursor-pointer transition-colors"
+                              title="Remove Photo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="text-[10px] text-white font-medium truncate">
+                            {photo.caption}
+                          </div>
                         </div>
-                        <div className="text-[10px] text-white font-medium truncate">{photo.caption}</div>
+                        {photo.isCover && (
+                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-[#C85A32] text-white text-[9px] font-bold uppercase tracking-wider">
+                            Cover
+                          </div>
+                        )}
                       </div>
-                      {photo.isCover && (
-                        <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-[#C85A32] text-white text-[9px] font-bold uppercase tracking-wider shadow-xs">
-                          Cover
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between pt-4 border-t border-[#E7E1DA]">
@@ -647,7 +670,7 @@ export const PhotographerApplyPage: React.FC = () => {
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back
                 </Button>
                 <Button onClick={() => setCurrentStep(5)} className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2">
-                  <span>Review & Publish</span>
+                  <span>Continue to Review</span>
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </div>

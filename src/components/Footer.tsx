@@ -8,7 +8,7 @@ export const Footer: React.FC = () => {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-[#181615] text-white">
+    <footer className="bg-[#181615] text-white pb-20 md:pb-0">
       {/* Top CTA Strip */}
       <div className="border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
@@ -121,9 +121,9 @@ export const Footer: React.FC = () => {
             © {year} MTShoots. All rights reserved. India's Verified Photography Network.
           </p>
           <div className="flex items-center gap-4">
-            <a href="#" className="text-[11px] text-white/40 hover:text-white/70 transition-colors">Privacy Policy</a>
-            <a href="#" className="text-[11px] text-white/40 hover:text-white/70 transition-colors">Terms of Service</a>
-            <a href="#" className="text-[11px] text-white/40 hover:text-white/70 transition-colors">Cancellation Policy</a>
+            <Link to="/privacy" className="text-[11px] text-white/40 hover:text-white/70 transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="text-[11px] text-white/40 hover:text-white/70 transition-colors">Terms of Service</Link>
+            <Link to="/cancellation" className="text-[11px] text-white/40 hover:text-white/70 transition-colors">Cancellation Policy</Link>
           </div>
         </div>
       </div>

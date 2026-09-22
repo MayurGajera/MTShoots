@@ -59,7 +59,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
     if (photographer.heroImage) {
       list.push({
         url: photographer.heroImage,
-        title: `${photographer.name} — Signature Frame`,
+        title: `${photographer.name}  -  Signature Frame`,
         category: photographer.primaryCategory,
         specs: photographer.cameraFormat
       });
@@ -206,7 +206,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: `${photographer.name} — MTShoots`,
+        title: `${photographer.name}  -  MTShoots`,
         text: `Book ${photographer.name}, verified ${photographer.primaryCategory} photographer on MTShoots.`,
         url: window.location.href
       }).catch(() => {});

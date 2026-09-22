@@ -1,3 +1,8 @@
+html, body {
+  max-width: 100vw;
+  overflow-x: clip;
+}
+
 @import "tailwindcss";
 
 @layer base {
@@ -221,4 +226,27 @@
 /* ===== Mobile-safe bottom spacing ===== */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* ===== Mobile Bottom Nav Clearance ===== */
+/* Ensures content is not hidden behind the fixed PwaNav (h-16 = 64px) on mobile */
+.mobile-bottom-clearance {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 16px);
+}
+@media (min-width: 768px) {
+  .mobile-bottom-clearance {
+    padding-bottom: 0;
+  }
+}
+
+/* ===== Smooth page transitions ===== */
+.page-fade-in {
+  animation: fadeInUp 0.35s ease both;
+}
+
+/* ===== Touch-friendly tap targets ===== */
+@media (hover: none) {
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+  }
 }

@@ -10,6 +10,7 @@ import {
   MapPin,
   ChevronDown,
   Smartphone,
+  Download,
   User,
   Settings,
   KeyRound,
@@ -23,6 +24,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { MTShootsLogo } from './MTShootsLogo';
+import { getUserByEmail, upsertUser, getUserAddresses, addUserAddress, deleteUserAddress, getUserDevices, deactivateDevice, DbUserAddress, DbUserDevice } from '@/lib/supabase';
 
 interface NavbarProps {
   currentTab?: 'roster' | 'callsheets' | 'shortlist';
@@ -64,6 +66,39 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   // Modals for settings and change password
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'addresses' | 'devices'>('profile');
+  const [userAddresses, setUserAddresses] = useState<DbUserAddress[]>([]);
+  const [userDevices, setUserDevices] = useState<DbUserDevice[]>([]);
+  const [showAddAddress, setShowAddAddress] = useState(false);
+  const [newAddrLabel, setNewAddrLabel] = useState('Home');
+  const [newAddrStreet, setNewAddrStreet] = useState('');
+  const [newAddrCity, setNewAddrCity] = useState('');
+  const [newAddrState, setNewAddrState] = useState('');
+  const [newAddrPincode, setNewAddrPincode] = useState('');
+  const [newAddrIsDefault, setNewAddrIsDefault] = useState(false);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+
+  const loadUserAccountData = async (targetEmail: string) => {
+    try {
+      let dbUser = await getUserByEmail(targetEmail);
+      if (!dbUser && user) {
+        dbUser = await upsertUser({
+          email: targetEmail,
+          full_name: user.fullName || 'User',
+          city: user.city,
+          avatar_url: user.avatar
+        });
+      }
+      if (dbUser?.id) {
+        const [addrs, devs] = await Promise.all([
+          getUserAddresses(dbUser.id),
+          getUserDevices(dbUser.id)
+        ]);
+        setUserAddresses(addrs);
+        setUserDevices(devs);
+      }
+    } catch {}
+  };
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   // Settings form states
@@ -142,9 +177,65 @@ export const Navbar: React.FC<NavbarProps> = ({
       setSettingsPhone(user.phone || '');
       setSettingsCity(user.city || currentCity);
       setSettingsAvatar(user.avatar || PRESET_USER_AVATARS[0]);
+      if (user.email) {
+        loadUserAccountData(user.email);
+      }
     }
+    setSettingsTab('profile');
+    setShowAddAddress(false);
     setIsSettingsOpen(true);
     setUserDropdownOpen(false);
+  };
+
+  const handleAddAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.email || !newAddrCity.trim()) return;
+    setIsSavingAddress(true);
+    try {
+      let dbUser = await getUserByEmail(user.email);
+      if (!dbUser) {
+        dbUser = await upsertUser({
+          email: user.email,
+          full_name: user.fullName || 'User',
+          city: user.city,
+          avatar_url: user.avatar
+        });
+      }
+      if (dbUser?.id) {
+        await addUserAddress({
+          user_id: dbUser.id,
+          label: newAddrLabel,
+          street: newAddrStreet,
+          city: newAddrCity,
+          state: newAddrState,
+          pincode: newAddrPincode,
+          landmark: null,
+          is_default: newAddrIsDefault,
+        });
+        const updatedAddrs = await getUserAddresses(dbUser.id);
+        setUserAddresses(updatedAddrs);
+        setShowAddAddress(false);
+        setNewAddrStreet('');
+        setNewAddrCity('');
+        setNewAddrState('');
+        setNewAddrPincode('');
+        triggerToast('Address saved to profile!');
+      }
+    } catch {} finally {
+      setIsSavingAddress(false);
+    }
+  };
+
+  const handleDeleteAddress = async (addrId: string) => {
+    await deleteUserAddress(addrId);
+    setUserAddresses(prev => prev.filter(a => a.id !== addrId));
+    triggerToast('Address removed');
+  };
+
+  const handleRevokeDevice = async (devId: string) => {
+    await deactivateDevice(devId);
+    setUserDevices(prev => prev.filter(d => d.id !== devId));
+    triggerToast('Device access revoked');
   };
 
   const handleSaveSettings = (e: React.FormEvent) => {
@@ -286,10 +377,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))}
-              className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#E7E1DA] hover:border-[#C85A32] text-xs font-semibold text-[#57423b] hover:text-[#C85A32] hover:bg-[#F4EFEB] transition-all cursor-pointer"
+              className="hidden xl:inline-flex items-center gap-1.5 px-3 h-8 rounded-full border border-[#E7E1DA] hover:border-[#C85A32] text-xs font-semibold text-[#57423b] hover:text-[#C85A32] hover:bg-[#F4EFEB] transition-all cursor-pointer shrink-0 whitespace-nowrap"
               title="Install MTShoots as an App"
             >
-              <Smartphone className="w-3.5 h-3.5 text-[#C85A32]" />
+              <Download className="w-3.5 h-3.5 text-[#C85A32] shrink-0" />
               <span>Install App</span>
             </button>
 
@@ -357,7 +448,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           </div>
                         </div>
                         <div className="mt-2 flex items-center justify-between text-[10px] text-[#2D593E] font-bold bg-[#EAF4ED] px-2 py-0.5 rounded-full">
-                          <span>âœ“ Verified Client</span>
+                          <span>âœ" Verified Client</span>
                           <span>{user.city || currentCity}</span>
                         </div>
                       </div>
@@ -404,16 +495,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="hidden md:flex items-center gap-1.5">
+              <div className="hidden md:flex items-center gap-1.5 shrink-0">
                 <Link
                   to="/photographers/apply"
-                  className="text-xs font-semibold text-[#57423b] px-3 py-1.5 rounded-full border border-[#E7E1DA] hover:border-[#dec0b7] hover:bg-[#F4EFEB] transition-all cursor-pointer whitespace-nowrap"
+                  className="text-xs font-semibold text-[#57423b] px-3.5 h-8 rounded-full border border-[#E7E1DA] hover:border-[#dec0b7] hover:bg-[#F4EFEB] transition-all cursor-pointer flex items-center justify-center shrink-0 whitespace-nowrap"
                 >
                   Join as Photographer
                 </Link>
                 <Link
                   to="/auth"
-                  className="text-xs font-bold text-white bg-[#181615] px-4 py-1.5 rounded-full hover:bg-[#C85A32] transition-all cursor-pointer shadow-sm whitespace-nowrap"
+                  className="text-xs font-bold text-white bg-[#181615] px-4 h-8 rounded-full hover:bg-[#C85A32] transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 whitespace-nowrap"
                 >
                   Sign In
                 </Link>
@@ -454,50 +545,72 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
 
-              <Link
-                to="/photographers"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-xs font-semibold text-[#181615] hover:bg-[#FAF8F5]"
-              >
-                Photographers Directory
-              </Link>
-              <Link
-                to="/bookings"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-xs font-semibold text-[#181615] hover:bg-[#FAF8F5]"
-              >
-                Bookings {bookingCount > 0 && `(${bookingCount})`}
-              </Link>
-              <Link
-                to="/saved"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-xs font-semibold text-[#181615] hover:bg-[#FAF8F5]"
-              >
-                Saved Photographers {shortlistCount > 0 && `(${shortlistCount})`}
-              </Link>
-              <Link
-                to="/photographers/apply"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-xs font-bold text-[#C85A32] hover:bg-[#FAF8F5]"
-              >
-                Join as Photographer
-              </Link>
+              {/* Centered navigation items with icons */}
+              <div className="flex flex-col items-center gap-1.5 py-1.5">
+                <Link
+                  to="/photographers"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                >
+                  <Camera className="w-4 h-4 text-[#C85A32]" />
+                  <span>Photographers Directory</span>
+                </Link>
+
+                <Link
+                  to="/bookings"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                >
+                  <Calendar className="w-4 h-4 text-[#C85A32]" />
+                  <span>Bookings</span>
+                  {bookingCount > 0 && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-[#FAF8F5] text-[11px] font-bold text-[#C85A32] border border-[#E7E1DA]">
+                      {bookingCount}
+                    </span>
+                  )}
+                </Link>
+
+                <Link
+                  to="/saved"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                >
+                  <Heart className="w-4 h-4 text-[#C85A32]" />
+                  <span>Saved Photographers</span>
+                  {shortlistCount > 0 && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-[#FAF8F5] text-[11px] font-bold text-[#C85A32] border border-[#E7E1DA]">
+                      {shortlistCount}
+                    </span>
+                  )}
+                </Link>
+
+                <Link
+                  to="/photographers/apply"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-[#C85A32] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                >
+                  <Plus className="w-4 h-4 text-[#C85A32]" />
+                  <span>Join as Photographer</span>
+                </Link>
+              </div>
 
               <div className="pt-2 border-t border-[#E7E1DA]">
                 {user ? (
                   <button
                     onClick={handleSignOut}
-                    className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 cursor-pointer transition-colors"
                   >
-                    Sign Out
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
                   </button>
                 ) : (
                   <Link
                     to="/auth"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block text-center px-4 py-2 rounded-xl bg-[#181615] text-white font-bold text-xs"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#181615] text-white font-bold text-xs shadow-md hover:bg-black transition-all active:scale-[0.98]"
                   >
-                    Sign In to Account
+                    <User className="w-4 h-4" />
+                    <span>Sign In to Account</span>
                   </Link>
                 )}
               </div>
@@ -506,11 +619,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* Account Settings Modal */}
+            {/* Account Settings Modal */}
       {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-[#E7E1DA]">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E1DA]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col p-5 sm:p-6 space-y-4 shadow-2xl border border-[#E7E1DA] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#E7E1DA] shrink-0">
               <div className="flex items-center gap-2">
                 <Settings className="w-4 h-4 text-[#C85A32]" />
                 <h3 className="font-serif text-lg font-bold text-[#181615]">Account Settings</h3>
@@ -523,76 +637,313 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveSettings} className="space-y-4">
-              {/* Avatar Picker */}
-              <div className="text-center space-y-2">
-                <img
-                  src={settingsAvatar || PRESET_USER_AVATARS[0]}
-                  alt="Avatar Preview"
-                  className="w-16 h-16 rounded-full object-cover mx-auto ring-4 ring-[#C85A32]/20"
-                />
-                <div className="text-[11px] text-[#8a726a]">Choose profile avatar:</div>
-                <div className="flex items-center justify-center gap-2">
-                  {PRESET_USER_AVATARS.map((av, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setSettingsAvatar(av)}
-                      className={`w-8 h-8 rounded-full overflow-hidden border-2 transition-all cursor-pointer ${
-                        settingsAvatar === av ? 'border-[#C85A32] scale-110' : 'border-transparent opacity-70'
-                      }`}
+            {/* Tabs Header */}
+            <div className="flex items-center gap-1.5 p-1 bg-[#F4EFEB] rounded-xl shrink-0">
+              <button
+                type="button"
+                onClick={() => setSettingsTab('profile')}
+                className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ' + (settingsTab === 'profile' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
+              >
+                Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsTab('addresses')}
+                className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ' + (settingsTab === 'addresses' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
+              >
+                Addresses
+                <span className="px-1.5 py-0.2 bg-[#C85A32]/10 text-[#C85A32] rounded-full text-[10px]">{userAddresses.length}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsTab('devices')}
+                className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ' + (settingsTab === 'devices' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
+              >
+                Devices
+                <span className="px-1.5 py-0.2 bg-[#C85A32]/10 text-[#C85A32] rounded-full text-[10px]">{userDevices.length}</span>
+              </button>
+            </div>
+
+            {/* Tab 1: Profile */}
+            {settingsTab === 'profile' && (
+              <form onSubmit={handleSaveSettings} className="space-y-4 overflow-y-auto pr-1 flex-1">
+                {/* Avatar Picker */}
+                <div className="text-center space-y-2.5">
+                  <div className="relative inline-block mx-auto">
+                    <img
+                      src={settingsAvatar || PRESET_USER_AVATARS[0]}
+                      alt="Avatar Preview"
+                      className="w-16 h-16 rounded-full object-cover ring-4 ring-[#C85A32]/20 shadow-sm"
+                    />
+                    <label
+                      className="absolute bottom-0 right-0 p-1.5 rounded-full bg-[#C85A32] text-white cursor-pointer hover:bg-[#b04a25] shadow-md transition-transform hover:scale-105"
+                      title="Upload profile photo from device"
                     >
-                      <img src={av} alt="Preset" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+                      <Upload className="w-3.5 h-3.5" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              if (typeof reader.result === 'string') {
+                                setSettingsAvatar(reader.result);
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="text-[11px] text-[#8a726a]">
+                    Upload custom photo or select a preset:
+                  </div>
+                  <div className="flex items-center justify-center gap-2">
+                    {PRESET_USER_AVATARS.map((av, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setSettingsAvatar(av)}
+                        className={'w-8 h-8 rounded-full overflow-hidden border-2 transition-all cursor-pointer ' + (settingsAvatar === av ? 'border-[#C85A32] scale-110 ring-2 ring-[#C85A32]/20' : 'border-transparent opacity-70 hover:opacity-100')}
+                      >
+                        <img src={av} alt="Preset" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#181615] mb-1">Full Legal Name</label>
+                  <Input
+                    value={settingsName}
+                    onChange={(e) => setSettingsName(e.target.value)}
+                    placeholder="e.g. Rahul Sharma"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#181615] mb-1">Phone Number</label>
+                  <Input
+                    value={settingsPhone}
+                    onChange={(e) => setSettingsPhone(e.target.value)}
+                    placeholder="e.g. +91 98765 43210"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#181615] mb-1">City</label>
+                  <Input
+                    value={settingsCity}
+                    onChange={(e) => setSettingsCity(e.target.value)}
+                    placeholder="e.g. Mumbai, Maharashtra"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-[#E7E1DA]">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="text-xs font-semibold"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs"
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {/* Tab 2: Addresses (Multi-Address) */}
+            {settingsTab === 'addresses' && (
+              <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-[#181615]">Saved Shoot & Billing Addresses</div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAddAddress(!showAddAddress)}
+                    className="text-[11px] h-7 px-2.5 flex items-center gap-1 text-[#C85A32] border-[#C85A32]/30 hover:bg-[#C85A32]/5"
+                  >
+                    <Plus className="w-3 h-3" />
+                    {showAddAddress ? 'Cancel' : 'Add Address'}
+                  </Button>
+                </div>
+
+                {/* Add Address Form */}
+                {showAddAddress && (
+                  <form onSubmit={handleAddAddress} className="p-3.5 bg-[#FAF8F5] rounded-2xl border border-[#E7E1DA] space-y-2.5 animate-in fade-in duration-150">
+                    <div className="text-xs font-bold text-[#181615]">Add New Address</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#8a726a] mb-0.5">Label</label>
+                        <select
+                          value={newAddrLabel}
+                          onChange={(e) => setNewAddrLabel(e.target.value)}
+                          className="w-full text-xs p-2 rounded-xl border border-[#E7E1DA] bg-white focus:outline-none focus:border-[#C85A32]"
+                        >
+                          <option value="Home">Home</option>
+                          <option value="Office">Office</option>
+                          <option value="Studio">Studio</option>
+                          <option value="Shoot Location">Shoot Location</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#8a726a] mb-0.5">City *</label>
+                        <Input
+                          value={newAddrCity}
+                          onChange={(e) => setNewAddrCity(e.target.value)}
+                          placeholder="e.g. Mumbai"
+                          className="text-xs h-8"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-[#8a726a] mb-0.5">Street / Building</label>
+                      <Input
+                        value={newAddrStreet}
+                        onChange={(e) => setNewAddrStreet(e.target.value)}
+                        placeholder="Flat, building, street, area"
+                        className="text-xs h-8"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#8a726a] mb-0.5">State</label>
+                        <Input
+                          value={newAddrState}
+                          onChange={(e) => setNewAddrState(e.target.value)}
+                          placeholder="e.g. Maharashtra"
+                          className="text-xs h-8"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#8a726a] mb-0.5">PIN Code</label>
+                        <Input
+                          value={newAddrPincode}
+                          onChange={(e) => setNewAddrPincode(e.target.value)}
+                          placeholder="400050"
+                          className="text-xs h-8"
+                        />
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer pt-1">
+                      <input
+                        type="checkbox"
+                        checked={newAddrIsDefault}
+                        onChange={(e) => setNewAddrIsDefault(e.target.checked)}
+                        className="rounded accent-[#C85A32]"
+                      />
+                      <span className="text-xs text-[#57423b]">Set as default address</span>
+                    </label>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <Button
+                        type="submit"
+                        disabled={isSavingAddress}
+                        className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs h-8 px-4"
+                      >
+                        {isSavingAddress ? 'Saving...' : 'Save Address'}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Addresses List */}
+                <div className="space-y-2">
+                  {userAddresses.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-[#8a726a] bg-[#FAF8F5] rounded-2xl border border-dashed border-[#E7E1DA]">
+                      No addresses saved yet. Click "Add Address" to add your shoot or studio location.
+                    </div>
+                  ) : (
+                    userAddresses.map((addr) => (
+                      <div key={addr.id} className="p-3 bg-[#FAF8F5] rounded-2xl border border-[#E7E1DA] flex items-start justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-[#181615]">{addr.label}</span>
+                            {addr.is_default && (
+                              <span className="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-700 rounded-md">Default</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-[#57423b]">
+                            {[addr.street, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ')}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAddress(addr.id)}
+                          className="p-1 rounded-lg text-[#8a726a] hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Delete address"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
+            )}
 
-              <div>
-                <label className="block text-xs font-bold text-[#181615] mb-1">Full Name</label>
-                <Input
-                  value={settingsName}
-                  onChange={(e) => setSettingsName(e.target.value)}
-                  placeholder="Your Name"
-                  required
-                />
-              </div>
+            {/* Tab 3: Devices (Multi-Device Access) */}
+            {settingsTab === 'devices' && (
+              <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+                <div className="text-xs text-[#8a726a]">
+                  These devices and sessions currently have active access to your MTShoots account.
+                </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#181615] mb-1">Phone Number</label>
-                <Input
-                  value={settingsPhone}
-                  onChange={(e) => setSettingsPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
-                />
+                <div className="space-y-2">
+                  {userDevices.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-[#8a726a] bg-[#FAF8F5] rounded-2xl border border-dashed border-[#E7E1DA]">
+                      No other devices logged in. This current session is active.
+                    </div>
+                  ) : (
+                    userDevices.map((dev) => {
+                      const isMobile = dev.device_type === 'ios' || dev.device_type === 'android';
+                      const isDesktop = dev.device_type === 'desktop';
+                      return (
+                        <div key={dev.id} className="p-3 bg-[#FAF8F5] rounded-2xl border border-[#E7E1DA] flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-white border border-[#E7E1DA] flex items-center justify-center shrink-0 text-[#C85A32]">
+                              {isMobile ? <Smartphone className="w-4 h-4" /> : isDesktop ? <Laptop className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-[#181615]">{dev.device_name}</span>
+                                <span className="px-1.5 py-0.2 uppercase text-[9px] font-bold bg-[#E7E1DA] text-[#57423b] rounded">
+                                  {dev.device_type || 'web'}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-[#8a726a] flex items-center gap-1.5 mt-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span>Active session</span>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeDevice(dev.id)}
+                            className="text-[11px] font-bold text-red-600 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#181615] mb-1">City</label>
-                <Input
-                  value={settingsCity}
-                  onChange={(e) => setSettingsCity(e.target.value)}
-                  placeholder="e.g. Mumbai"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#E7E1DA]">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="text-xs font-semibold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs"
-                >
-                  Save Changes
-                </Button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}
@@ -635,9 +986,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                    required
-                  />
+                    placeholder="Enter password" />
                 </div>
 
                 <div>
@@ -646,9 +995,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                    required
-                  />
+                    placeholder="Enter password" />
                 </div>
 
                 <div>
@@ -657,9 +1004,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                    required
-                  />
+                    placeholder="Enter password" />
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-[#E7E1DA]">
@@ -687,7 +1032,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#181615] text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl border border-white/10 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <span>âœ“</span>
+          <span>âœ"</span>
           <span>{toastMessage}</span>
         </div>
       )}

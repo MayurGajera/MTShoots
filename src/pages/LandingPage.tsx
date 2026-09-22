@@ -1,8 +1,8 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from '@/lib/navigation';
 import {
-  Camera, Star, Shield, Clock, ChevronRight, Play, Search,
+  Camera, Star, Shield, Clock, ChevronRight, ChevronLeft, Quote, Play, Search,
   CheckCircle2, Users, Image, Calendar as CalendarIcon, Sparkles, ArrowRight,
   ShieldCheck, Award, Zap, Heart, MapPin, Locate
 } from 'lucide-react';
@@ -12,6 +12,7 @@ import { Footer } from '../components/Footer';
 import { MTShootsLogo } from '../components/MTShootsLogo';
 import { PhotographerCard } from '../components/PhotographerCard';
 import { INITIAL_PHOTOGRAPHERS } from '../data/photographers';
+import { fetchCategories, fetchTestimonials } from '@/lib/supabase';
 
 const HERO_IMAGES = [
   'https://images.unsplash.com/photo-1537944434965-cf4679d1a598?auto=format&fit=crop&w=1600&q=85',
@@ -39,7 +40,7 @@ const STATS = [
 const HOW_IT_WORKS = [
   { step: '01', title: 'Browse & Discover', description: 'Explore verified photographers by category, location, budget, and live dates. View real portfolios and read verified reviews.', icon: Search },
   { step: '02', title: 'Choose Date & Book', description: 'Select your preferred artist, pick a shoot date from their real-time calendar, and configure your duration & license tier.', icon: CalendarIcon },
-  { step: '03', title: 'Shoot & Receive', description: 'Your artist arrives fully equipped. After the shoot, receive fully edited, high-resolution galleries within 3–5 business days.', icon: Image },
+  { step: '03', title: 'Shoot & Receive', description: 'Your artist arrives fully equipped. After the shoot, receive fully edited, high-resolution galleries within 3 - 5 business days.', icon: Image },
 ];
 
 const TESTIMONIALS = [
@@ -67,6 +68,71 @@ const TESTIMONIALS = [
 ];
 
 export const LandingPage: React.FC = () => {
+  const [categoriesList, setCategoriesList] = useState(CATEGORIES);
+  const [testimonialsList, setTestimonialsList] = useState(TESTIMONIALS);
+  const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [isTestimonialHovered, setIsTestimonialHovered] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isTestimonialHovered || testimonialsList.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveTestimonial(prev => (prev + 1) % testimonialsList.length);
+    }, 5500);
+    return () => clearInterval(interval);
+  }, [isTestimonialHovered, testimonialsList.length]);
+
+  const handlePrevTestimonial = () => {
+    setActiveTestimonial(prev => (prev - 1 + testimonialsList.length) % testimonialsList.length);
+  };
+  const handleNextTestimonial = () => {
+    setActiveTestimonial(prev => (prev + 1) % testimonialsList.length);
+  };
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX;
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+  const handleTouchEnd = () => {
+    if (touchStartX.current === null || touchEndX.current === null) return;
+    const diff = touchStartX.current - touchEndX.current;
+    if (diff > 45) {
+      handleNextTestimonial();
+    } else if (diff < -45) {
+      handlePrevTestimonial();
+    }
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
+
+  useEffect(() => {
+    fetchCategories().then(dbCats => {
+      if (dbCats && dbCats.length > 0) {
+        const filtered = dbCats.filter(c => c.id !== 'all').map(c => ({
+          name: c.name,
+          image: c.image_url || 'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?auto=format&fit=crop&w=400&q=80',
+          count: c.popular_count || '25+ photographers'
+        }));
+        if (filtered.length > 0) setCategoriesList(filtered);
+      }
+    }).catch(() => {});
+
+    fetchTestimonials().then(dbTests => {
+      if (dbTests && dbTests.length > 0) {
+        setTestimonialsList(dbTests.map(t => ({
+          quote: t.quote,
+          name: t.author_name || 'Verified Client',
+          author: t.author_name || 'Verified Client',
+          role: t.author_role || 'Photography Client',
+          avatar: t.author_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+          rating: t.rating || 5,
+          shootType: t.shoot_type || 'Photography'
+        })));
+      }
+    }).catch(() => {});
+  }, []);
   const navigate = useNavigate();
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroLoaded, setHeroLoaded] = useState(false);
@@ -184,12 +250,9 @@ export const LandingPage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-[1.12] tracking-tight"
+              className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-[1.15] tracking-tight"
             >
               Book India's Finest Photographers
-              <span className="block text-[#D9A05B] mt-1 font-sans font-extrabold tracking-normal">
-                Directly by Date &amp; Location
-              </span>
             </motion.h1>
 
             {/* Subtext */}
@@ -305,7 +368,7 @@ export const LandingPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-[#D9A05B]" />
-                <span>3–5 Day High-Res Delivery</span>
+                <span>3 - 5 Day High-Res Delivery</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Shield className="w-4 h-4 text-[#7B9ED9]" />
@@ -406,12 +469,12 @@ export const LandingPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5">
-            {CATEGORIES.map(cat => (
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-5">
+            {categoriesList.map(cat => (
               <Link
                 key={cat.name}
                 to={`/photographers?category=${encodeURIComponent(cat.name)}`}
-                className="group relative overflow-hidden rounded-3xl aspect-[3/4] cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1.5"
+                className="group relative overflow-hidden rounded-3xl aspect-[3/4] cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1.5 w-[calc(50%-0.5rem)] sm:w-[calc(33.333%-0.85rem)] md:w-[calc(25%-1rem)] lg:w-[calc(20%-1rem)] max-w-[220px]"
               >
                 <img
                   src={cat.image}
@@ -438,7 +501,7 @@ export const LandingPage: React.FC = () => {
       {/* ============================================================ */}
       {/* HOW IT WORKS                                                 */}
       {/* ============================================================ */}
-      <section className="bg-[#181615] text-white py-16 sm:py-24">
+      <section className="bg-[#181615] text-white py-16 sm:py-24 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#D9A05B] mb-3">
@@ -453,64 +516,188 @@ export const LandingPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
             {HOW_IT_WORKS.map((step, idx) => (
-              <div key={step.step} className="relative text-center group">
+              <div key={step.step} className="relative text-center group flex flex-col items-center">
+                {/* Horizontal connector line on desktop/tablet - spans from icon edge to next icon edge */}
                 {idx < HOW_IT_WORKS.length - 1 && (
-                  <div className="hidden sm:block absolute top-10 left-[60%] w-[80%] h-px border-t-2 border-dashed border-white/15" />
+                  <div className="hidden md:flex items-center absolute top-10 -translate-y-1/2 left-[calc(50%+46px)] w-[calc(100%-92px+2rem)] lg:w-[calc(100%-92px+3rem)] pointer-events-none z-0">
+                    <div className="w-full border-t-2 border-dashed border-[#D9A05B]/40" />
+                    <div className="w-2 h-2 rounded-full bg-[#D9A05B] shrink-0 -ml-1 shadow-sm shadow-[#D9A05B]/60" />
+                  </div>
                 )}
-                <div className="w-20 h-20 rounded-3xl bg-white/10 border border-white/15 flex items-center justify-center mx-auto mb-5 group-hover:bg-[#C85A32] transition-colors duration-300">
+
+                {/* Step Icon Badge - elevated above line */}
+                <div className="relative z-10 w-20 h-20 rounded-3xl bg-[#221f1d] border border-white/15 flex items-center justify-center mx-auto mb-5 group-hover:bg-[#C85A32] group-hover:border-[#C85A32] transition-all duration-300 shadow-xl">
                   <step.icon className="w-8 h-8 text-[#D9A05B] group-hover:text-white transition-colors" />
                 </div>
+
                 <div className="text-[11px] font-bold text-[#D9A05B] tracking-widest mb-2">STEP {step.step}</div>
                 <h3 className="font-serif text-xl font-bold text-white mb-2.5">{step.title}</h3>
-                <p className="text-sm text-white/60 leading-relaxed">{step.description}</p>
+                <p className="text-sm text-white/60 leading-relaxed max-w-xs">{step.description}</p>
+
+                {/* Vertical connector line on mobile devices between steps */}
+                {idx < HOW_IT_WORKS.length - 1 && (
+                  <div className="md:hidden flex flex-col items-center my-4 pointer-events-none">
+                    <div className="w-0.5 h-7 border-l-2 border-dashed border-[#D9A05B]/35" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#D9A05B]/60 -mt-0.5" />
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
       </section>
 
+            {/* ============================================================ */}
+      {/* TESTIMONIALS 3D CAROUSEL SLIDER (FULL-WIDTH 3D STAGE)       */}
       {/* ============================================================ */}
-      {/* TESTIMONIALS                                                 */}
-      {/* ============================================================ */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
-        <div className="text-center mb-12">
+      <section className="w-full max-w-full py-16 sm:py-24 overflow-hidden relative bg-[#FAF8F5]">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center mb-10 sm:mb-14">
           <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#C85A32] mb-3">
             <Star className="w-3.5 h-3.5 fill-[#D9A05B] text-[#D9A05B]" />
-            <span>Verified Reviews</span>
+            <span>Verified Reviews &amp; Client Stories</span>
           </div>
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#181615]">
+          <h2 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-[#181615] tracking-tight">
             Loved by Brands &amp; Couples Alike
           </h2>
+          <p className="text-xs sm:text-sm text-[#8a726a] max-w-md mx-auto mt-2.5">
+            Real shoot experiences from clients across India. Click side cards or swipe to explore.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-          {TESTIMONIALS.map((t, idx) => (
-            <div
-              key={idx}
-              className="bg-white rounded-3xl p-7 border border-[#E7E1DA] shadow-sm hover:shadow-xl transition-shadow flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center space-x-1 mb-4">
-                  {[...Array(t.rating)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-[#D9A05B] text-[#D9A05B]" />
-                  ))}
-                </div>
-                <p className="text-sm text-[#57423b] italic leading-relaxed">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-              </div>
+        {/* Full-width 3D Carousel Stage */}
+        <div
+          className="relative w-full max-w-full overflow-hidden select-none py-4"
+          onMouseEnter={() => setIsTestimonialHovered(true)}
+          onMouseLeave={() => setIsTestimonialHovered(false)}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="relative h-[340px] sm:h-[300px] md:h-[280px] w-full flex items-center justify-center">
+            {testimonialsList.map((t, idx) => {
+              const total = testimonialsList.length;
+              let offset = (idx - activeTestimonial) % total;
+              while (offset > total / 2) offset -= total;
+              while (offset < -total / 2) offset += total;
 
-              <div className="flex items-center gap-3.5 mt-6 pt-5 border-t border-[#E7E1DA]">
-                <img src={t.avatar} alt={t.name} className="w-11 h-11 rounded-full object-cover" />
-                <div>
-                  <h4 className="font-serif text-sm font-bold text-[#181615]">{t.name}</h4>
-                  <p className="text-xs text-[#8a726a]">{t.role}</p>
+              const isCenter = offset === 0;
+              const isLeft = offset === -1 || (offset < 0 && Math.abs(offset) < 1.5);
+              const isRight = offset === 1 || (offset > 0 && Math.abs(offset) < 1.5);
+
+              // 3D Slider transforms & effects
+              let transform = '';
+              let opacity = 0;
+              let filter = 'blur(6px)';
+              let zIndex = 0;
+              let pointerEvents = 'pointer-events-none';
+
+              if (isCenter) {
+                // Main / Center Card: Zoom In, 100% Opacity, Crisp, Elevated
+                transform = 'translate3d(-50%, -50%, 0) scale(1.04)';
+                opacity = 1;
+                filter = 'blur(0px)';
+                zIndex = 30;
+                pointerEvents = 'pointer-events-auto';
+              } else if (isLeft) {
+                // Left Card: Zoom Out, Light Blur, Lower Opacity, Peeking in from left
+                transform = 'translate3d(-50%, -50%, 0) translateX(-78%) scale(0.85)';
+                opacity = 0.45;
+                filter = 'blur(2.5px)';
+                zIndex = 10;
+                pointerEvents = 'pointer-events-auto cursor-pointer';
+              } else if (isRight) {
+                // Right Card: Zoom Out, Light Blur, Lower Opacity, Peeking in from right
+                transform = 'translate3d(-50%, -50%, 0) translateX(78%) scale(0.85)';
+                opacity = 0.45;
+                filter = 'blur(2.5px)';
+                zIndex = 10;
+                pointerEvents = 'pointer-events-auto cursor-pointer';
+              } else {
+                // Hidden offscreen
+                transform = `translate3d(-50%, -50%, 0) translateX(${offset < 0 ? '-140%' : '140%'}) scale(0.7)`;
+                opacity = 0;
+                filter = 'blur(8px)';
+                zIndex = 0;
+              }
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    if (isLeft) handlePrevTestimonial();
+                    if (isRight) handleNextTestimonial();
+                  }}
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    transform,
+                    opacity,
+                    filter,
+                    zIndex,
+                    transition: 'transform 500ms cubic-bezier(0.22, 1, 0.36, 1), opacity 500ms ease, filter 500ms ease, box-shadow 500ms ease',
+                  }}
+                  className={`absolute w-[84vw] max-w-[340px] sm:w-[460px] sm:max-w-[480px] md:w-[520px] md:max-w-[520px] bg-white rounded-3xl p-6 sm:p-7 border ${
+                    isCenter
+                      ? 'border-[#C85A32]/40 shadow-2xl shadow-[#C85A32]/12 ring-2 ring-[#C85A32]/15'
+                      : 'border-[#E7E1DA] shadow-md hover:opacity-60'
+                  } flex flex-col justify-between ${pointerEvents}`}
+                >
+                  <div>
+                    {/* Stars and Shoot Type Pill */}
+                    <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
+                      <div className="flex items-center space-x-1">
+                        {[...Array(t.rating || 5)].map((_, i) => (
+                          <Star key={i} className="w-4 h-4 fill-[#D9A05B] text-[#D9A05B]" />
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#FAF8F5] text-[#8a726a] border border-[#E7E1DA]">
+                        {t.shootType || 'Verified Client'}
+                      </span>
+                    </div>
+
+                    {/* Quote */}
+                    <p className="text-xs sm:text-sm text-[#181615] font-normal leading-relaxed italic line-clamp-4">
+                      &ldquo;{t.quote}&rdquo;
+                    </p>
+                  </div>
+
+                  {/* Author Footer */}
+                  <div className="flex items-center gap-3.5 mt-5 pt-4 border-t border-[#E7E1DA]">
+                    <img
+                      src={t.avatar || (t as any).author_avatar}
+                      alt={t.name || (t as any).author || 'Client'}
+                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover ring-2 ring-[#C85A32]/20 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <h4 className="font-serif text-sm font-bold text-[#181615] truncate">
+                        {t.name || (t as any).author || 'Verified Client'}
+                      </h4>
+                      <p className="text-xs text-[#8a726a] truncate">{t.role || (t as any).author_role || 'Client'}</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
+              );
+            })}
+          </div>
+
+          {/* Dots / Lines Indicator Controls (No buttons as requested) */}
+          <div className="flex items-center justify-center gap-2 mt-8">
+            {testimonialsList.map((_, dotIdx) => (
+              <button
+                key={dotIdx}
+                type="button"
+                onClick={() => setActiveTestimonial(dotIdx)}
+                aria-label={'Go to review ' + (dotIdx + 1)}
+                className={'h-2 sm:h-2.5 rounded-full transition-all duration-300 cursor-pointer ' + (
+                  activeTestimonial === dotIdx
+                    ? 'w-8 sm:w-10 bg-[#C85A32] shadow-sm'
+                    : 'w-2 sm:w-2.5 bg-[#E7E1DA] hover:bg-[#C85A32]/40'
+                )}
+              />
+            ))}
+          </div>
         </div>
       </section>
 

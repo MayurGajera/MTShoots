@@ -48,7 +48,7 @@ export const PwaNav: React.FC<PwaNavProps> = ({
           )}
         </Link>
 
-        {/* Book Shoot — center CTA */}
+        {/* Book Shoot  -  center CTA */}
         {onOpenNewBooking && (
           <button
             onClick={onOpenNewBooking}

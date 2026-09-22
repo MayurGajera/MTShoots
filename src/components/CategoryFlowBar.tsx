@@ -1,7 +1,8 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { PHOTOGRAPHY_CATEGORIES, PhotographyCategory } from '../data/categories';
 import { Sparkles } from 'lucide-react';
+import { fetchCategories } from '@/lib/supabase';
 
 interface CategoryFlowBarProps {
   selectedCategory: string;
@@ -16,6 +17,24 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
   photographerCountsByCategory,
   totalPhotographersCount
 }) => {
+  const [categories, setCategories] = useState<PhotographyCategory[]>(PHOTOGRAPHY_CATEGORIES);
+
+  useEffect(() => {
+    fetchCategories().then(dbCats => {
+      if (dbCats && dbCats.length > 0) {
+        const mapped: PhotographyCategory[] = dbCats.map(c => ({
+          id: c.id,
+          name: c.name,
+          shortName: c.short_name || c.name,
+          description: c.description || '',
+          image: c.image_url || '',
+          popularCount: c.popular_count || '0+ Shoots'
+        }));
+        setCategories(mapped);
+      }
+    }).catch(() => {});
+  }, []);
+
   const isAllSelected = !selectedCategory || selectedCategory === 'all' || selectedCategory === 'All Categories';
 
   return (
@@ -42,7 +61,7 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
 
       {/* Category Scroll Stream */}
       <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-none no-scrollbar">
-        {PHOTOGRAPHY_CATEGORIES.map((cat: PhotographyCategory) => {
+        {categories.map((cat: PhotographyCategory) => {
           const isAll = cat.id === 'all';
           const isSelected = isAll
             ? isAllSelected

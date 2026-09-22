@@ -3,8 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Search, Locate, X, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { fetchCities } from '@/lib/supabase';
 
-const MAJOR_CITIES = [
+const FALLBACK_MAJOR_CITIES = [
   'Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata',
   'Pune', 'Ahmedabad', 'Jaipur', 'Surat', 'Lucknow', 'Kanpur',
   'Nagpur', 'Indore', 'Bhopal', 'Visakhapatnam', 'Prayagraj', 'Patna',
@@ -26,6 +27,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   onDismiss,
   initialCity
 }) => {
+  const [cities, setCities] = useState<string[]>(FALLBACK_MAJOR_CITIES);
   const [query, setQuery] = useState('');
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedCity, setDetectedCity] = useState<string | null>(null);
@@ -35,6 +37,13 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   useScrollLock(true);
 
   useEffect(() => {
+    // Load dynamic cities from Supabase
+    fetchCities().then(dbCities => {
+      if (dbCities && dbCities.length > 0) {
+        setCities(dbCities);
+      }
+    }).catch(() => {});
+
     // Try to auto-detect location
     if (!initialCity) {
       setIsDetecting(true);
@@ -62,36 +71,37 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       }
     }
     setTimeout(() => inputRef.current?.focus(), 300);
-  }, []);
+  }, [initialCity]);
 
   const filtered = query.trim()
-    ? MAJOR_CITIES.filter(c => c.toLowerCase().includes(query.toLowerCase()))
-    : MAJOR_CITIES;
+    ? cities.filter(c => c.toLowerCase().includes(query.toLowerCase()))
+    : cities;
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.92, y: 24 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 16 }}
         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-        className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-[#E7E1DA]"
+        className="bg-white w-full max-w-md max-h-[90vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden border border-[#E7E1DA]"
       >
         {/* Header */}
-        <div className="relative bg-gradient-to-br from-[#181615] to-[#2D2421] px-6 pt-8 pb-6 text-white">
+        <div className="relative bg-gradient-to-br from-[#181615] to-[#2D2421] px-5 sm:px-6 pt-7 sm:pt-8 pb-5 sm:pb-6 text-white shrink-0">
           <button
             onClick={onDismiss}
+            aria-label="Close modal"
             className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/15 flex items-center justify-center hover:bg-white/25 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#C85A32] flex items-center justify-center">
+          <div className="flex items-center gap-3 mb-2 sm:mb-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#C85A32] flex items-center justify-center shrink-0">
               <MapPin className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="font-serif text-xl font-bold">Your Location</h2>
-              <p className="text-white/60 text-xs mt-0.5">Find photographers near you</p>
+              <h2 className="font-serif text-lg sm:text-xl font-bold">Your Location</h2>
+              <p className="text-white/60 text-xs mt-0.5">Find top photographers near you</p>
             </div>
           </div>
 
@@ -118,7 +128,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                 <Locate className="w-4 h-4 text-[#D9A05B] shrink-0" />
                 <div>
                   <div className="text-sm font-semibold">{detectedCity}</div>
-                  <div className="text-xs text-white/60">Detected near you • Use this location</div>
+                  <div className="text-xs text-white/60">Detected near you • Tap to select</div>
                 </div>
               </motion.button>
             )}
@@ -126,13 +136,13 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         </div>
 
         {/* Search */}
-        <div className="px-5 pt-4 pb-3">
+        <div className="px-4 sm:px-5 pt-4 pb-2 shrink-0">
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8a726a]" />
             <input
               ref={inputRef}
               type="text"
-              placeholder="Search city..."
+              placeholder="Search across 40+ Indian cities..."
               value={query}
               onChange={e => setQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E7E1DA] text-sm text-[#181615] focus:outline-none focus:border-[#C85A32] transition-colors"
@@ -141,15 +151,15 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         </div>
 
         {/* City List */}
-        <div className="px-5 pb-2 max-h-56 overflow-y-auto space-y-1">
+        <div className="px-4 sm:px-5 pb-2 flex-1 overflow-y-auto space-y-1 min-h-[160px] max-h-[260px]">
           {filtered.length === 0 ? (
-            <p className="text-xs text-[#8a726a] text-center py-4">No city found. Try a different spelling.</p>
+            <p className="text-xs text-[#8a726a] text-center py-6">No city found. Try a different spelling.</p>
           ) : (
             filtered.map(city => (
               <button
                 key={city}
                 onClick={() => onSelect(city)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[#F4EFEB] text-left transition-colors cursor-pointer group"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#F4EFEB] text-left transition-colors cursor-pointer group"
               >
                 <MapPin className="w-4 h-4 text-[#8a726a] shrink-0 group-hover:text-[#C85A32] transition-colors" />
                 <span className="text-sm font-medium text-[#181615]">{city}</span>
@@ -159,7 +169,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         </div>
 
         {/* Footer CTA */}
-        <div className="px-5 pb-5 pt-3 border-t border-[#E7E1DA] mt-2">
+        <div className="px-4 sm:px-5 pb-4 pt-3 border-t border-[#E7E1DA] shrink-0 bg-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs text-[#57423b]">
               <Camera className="w-3.5 h-3.5 text-[#C85A32]" />

@@ -232,7 +232,7 @@ export const CallSheetsView: React.FC<CallSheetsViewProps> = ({
                     Sunrise: 06:48 AM IST
                   </div>
                   <div className="text-xs text-[#57423b] mt-0.5">
-                    Golden Hour: 06:50–07:45 AM • Clear Sky 24°C
+                    Golden Hour: 06:50 - 07:45 AM • Clear Sky 24°C
                   </div>
                 </div>
 

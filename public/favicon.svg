@@ -1,0 +1,58 @@
+
+  <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#241E1C"/>
+        <stop offset="50%" stop-color="#181615"/>
+        <stop offset="100%" stop-color="#0E0C0B"/>
+      </linearGradient>
+      <linearGradient id="terracotta" x1="120" y1="180" x2="260" y2="340" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#E06B40"/>
+        <stop offset="100%" stop-color="#C85A32"/>
+      </linearGradient>
+      <linearGradient id="cream" x1="260" y1="180" x2="380" y2="340" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#FFFFFF"/>
+        <stop offset="100%" stop-color="#FAF8F5"/>
+      </linearGradient>
+      <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#F2C581"/>
+        <stop offset="100%" stop-color="#D9A05B"/>
+      </linearGradient>
+      <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.5"/>
+      </filter>
+      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="24" result="blur"/>
+        <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+      </filter>
+    </defs>
+
+    <!-- Background Base with subtle border -->
+    <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+    <rect x="2" y="2" width="508" height="508" rx="110" stroke="url(#terracotta)" stroke-width="4" stroke-opacity="0.25"/>
+
+    <!-- Subtle ambient glow in center -->
+    <circle cx="256" cy="256" r="140" fill="#C85A32" opacity="0.12" filter="url(#glow)"/>
+
+    <!-- Camera Container Icon -->
+    <g filter="url(#shadow)">
+      <!-- Outer Camera Body -->
+      <rect x="76" y="140" width="360" height="260" rx="60" stroke="#FFFFFF" stroke-width="22" stroke-opacity="0.9" fill="#1C1816" fill-opacity="0.6"/>
+
+      <!-- Viewfinder / Pentaprism Notch -->
+      <path d="M 184 140 L 206 94 L 306 94 L 328 140" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+      <!-- Stylized 'M' in Terracotta -->
+      <path d="M 130 330 L 130 200 L 195 275 L 256 200 L 256 330" stroke="url(#terracotta)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Stylized 'T' in Cream/White -->
+      <path d="M 276 200 L 382 200 M 329 200 L 329 330" stroke="url(#cream)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Golden Shutter / Focus Dot -->
+      <circle cx="370" cy="140" r="18" fill="url(#gold)"/>
+      <circle cx="370" cy="140" r="24" stroke="url(#gold)" stroke-width="3" opacity="0.6"/>
+
+      <!-- Golden Lens Center Dot -->
+      <circle cx="256" cy="256" r="14" fill="url(#gold)"/>
+    </g>
+  </svg>

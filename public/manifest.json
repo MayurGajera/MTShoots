@@ -1,10 +1,11 @@
 {
-  "name": "MTShoots",
+  "name": "MTShoots  -  Verified Photographers",
   "short_name": "MTShoots",
-  "description": "Book verified professional photographers across India",
+  "description": "Book verified professional photographers across India with upfront pricing and instant booking.",
   "start_url": "/",
+  "id": "/",
   "display": "standalone",
-  "background_color": "#FAF8F5",
+  "background_color": "#181615",
   "theme_color": "#C85A32",
   "orientation": "portrait-primary",
   "icons": [
@@ -12,13 +13,25 @@
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": ["photography", "business", "lifestyle"],

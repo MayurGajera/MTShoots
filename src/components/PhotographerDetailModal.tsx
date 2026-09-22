@@ -108,7 +108,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
   const uniqueCategories = Array.from(new Set(photographer.portfolio.map((p) => p.category)));
 
   const handleShareProfile = async () => {
-    const shareText = `${photographer.name} — ${photographer.location} — ${window.location.href}`;
+    const shareText = `${photographer.name}  -  ${photographer.location}  -  ${window.location.href}`;
     try {
       await navigator.clipboard.writeText(shareText);
       setShareCopied(true);
@@ -298,7 +298,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
                   <button
                     type="button"
                     onClick={() => {
-                      const text = `${photographer.name} office: ${photographer.officeLocation || photographer.location} — ${photographer.officeMapUrl || `https://www.google.com/maps?q=${encodeURIComponent(photographer.officeLocation || photographer.location)}`}`;
+                      const text = `${photographer.name} office: ${photographer.officeLocation || photographer.location}  -  ${photographer.officeMapUrl || `https://www.google.com/maps?q=${encodeURIComponent(photographer.officeLocation || photographer.location)}`}`;
                       navigator.clipboard?.writeText(text).catch(() => window.alert('Unable to copy the map link on this device.'));
                     }}
                     className="w-full rounded-lg bg-[#181615] px-3 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-white hover:bg-[#342f2d]"
