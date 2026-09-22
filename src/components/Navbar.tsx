@@ -24,7 +24,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { MTShootsLogo } from './MTShootsLogo';
-import { getUserByEmail, upsertUser, getUserAddresses, addUserAddress, deleteUserAddress, getUserDevices, deactivateDevice, DbUserAddress, DbUserDevice } from '@/lib/supabase';
+import { AvatarPicker } from './AvatarPicker';
+import { getUserByEmail, upsertUser, savePhotographerToSupabase, getUserAddresses, addUserAddress, deleteUserAddress, getUserDevices, deactivateDevice, DbUserAddress, DbUserDevice } from '@/lib/supabase';
 
 interface NavbarProps {
   currentTab?: 'roster' | 'callsheets' | 'shortlist';
@@ -44,13 +45,6 @@ interface UserProfile {
   city?: string;
   phone?: string;
 }
-
-const PRESET_USER_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80'
-];
 
 export const Navbar: React.FC<NavbarProps> = ({
   bookingCount = 0,
@@ -106,6 +100,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [settingsPhone, setSettingsPhone] = useState('');
   const [settingsCity, setSettingsCity] = useState('');
   const [settingsAvatar, setSettingsAvatar] = useState('');
+
+  // Photographer specific settings states
+  const [settingsBrandName, setSettingsBrandName] = useState('');
+  const [settingsGenre, setSettingsGenre] = useState('Wedding');
+  const [settingsBio, setSettingsBio] = useState('');
+  const [settingsStartingRate, setSettingsStartingRate] = useState<number>(40000);
+  const [settingsCameraBodies, setSettingsCameraBodies] = useState('');
+  const [settingsLenses, setSettingsLenses] = useState('');
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState('');
@@ -176,7 +178,21 @@ export const Navbar: React.FC<NavbarProps> = ({
       setSettingsName(user.fullName || '');
       setSettingsPhone(user.phone || '');
       setSettingsCity(user.city || currentCity);
-      setSettingsAvatar(user.avatar || PRESET_USER_AVATARS[0]);
+      setSettingsAvatar(user.avatar || '');
+      if (user.role === 'photographer') {
+        try {
+          const storedProfile = localStorage.getItem('mtshoots_photographer_profile');
+          if (storedProfile) {
+            const p = JSON.parse(storedProfile);
+            setSettingsBrandName(p.brandName || p.name || user.fullName || '');
+            setSettingsGenre(p.primaryDiscipline || p.discipline || p.genre || 'Wedding');
+            setSettingsBio(p.bio || '');
+            setSettingsStartingRate(Number(p.startingDayRate || p.startingRate || 40000));
+            setSettingsCameraBodies(Array.isArray(p.equipment?.cameraBodies) ? p.equipment.cameraBodies.join(', ') : (p.gear || ''));
+            setSettingsLenses(Array.isArray(p.equipment?.lenses) ? p.equipment.lenses.join(', ') : '');
+          }
+        } catch {}
+      }
       if (user.email) {
         loadUserAccountData(user.email);
       }
@@ -238,21 +254,73 @@ export const Navbar: React.FC<NavbarProps> = ({
     triggerToast('Device access revoked');
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    const trimmedName = settingsName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      triggerToast('Full name must be at least 2 characters');
+      return;
+    }
     const updated: UserProfile = {
       ...user,
-      fullName: settingsName,
-      phone: settingsPhone,
-      city: settingsCity,
-      avatar: settingsAvatar
+      fullName: trimmedName,
+      phone: settingsPhone.trim(),
+      city: settingsCity.trim() || currentCity,
+      avatar: settingsAvatar || ''
     };
     setUser(updated);
     localStorage.setItem('mtshoots_user', JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('mtshoots-auth-changed'));
+
+    try {
+      await upsertUser({
+        email: user.email,
+        full_name: trimmedName,
+        phone: settingsPhone.trim(),
+        city: settingsCity.trim() || currentCity,
+        avatar_url: settingsAvatar || '',
+        role: user.role || 'customer'
+      });
+    } catch (err) {
+      console.warn('Could not sync user profile update to Supabase:', err);
+    }
+
+    if (user.role === 'photographer') {
+      try {
+        let existingProfile: any = {};
+        const storedProfile = localStorage.getItem('mtshoots_photographer_profile');
+        if (storedProfile) {
+          existingProfile = JSON.parse(storedProfile);
+        }
+        const updatedPhotographer = {
+          ...existingProfile,
+          name: trimmedName,
+          brandName: settingsBrandName.trim() || trimmedName,
+          phone: settingsPhone.trim(),
+          city: settingsCity.trim() || currentCity,
+          avatar: settingsAvatar || '',
+          primaryDiscipline: settingsGenre,
+          startingDayRate: Number(settingsStartingRate) || 40000,
+          bio: settingsBio.trim(),
+          gear: settingsCameraBodies.trim(),
+          equipment: {
+            cameraBodies: settingsCameraBodies.split(',').map(s => s.trim()).filter(Boolean),
+            lenses: settingsLenses.split(',').map(s => s.trim()).filter(Boolean)
+          }
+        };
+        localStorage.setItem('mtshoots_photographer_profile', JSON.stringify(updatedPhotographer));
+        window.dispatchEvent(new CustomEvent('photographers-updated'));
+        try {
+          await savePhotographerToSupabase(updatedPhotographer);
+        } catch {}
+      } catch (err) {
+        console.warn('Could not sync photographer profile update:', err);
+      }
+    }
+
     setIsSettingsOpen(false);
-    triggerToast('Account details updated successfully!');
+    triggerToast('Account profile updated in database successfully!');
   };
 
   const handleOpenPasswordModal = () => {
@@ -319,7 +387,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         : 'text-[#57423b] hover:text-[#181615] hover:bg-[#F4EFEB]'
     }`;
 
-  const userAvatarImage = user?.avatar || PRESET_USER_AVATARS[0];
+  const hasUserAvatar = Boolean(user?.avatar && user.avatar.trim());
 
   return (
     <header className="sticky top-0 z-40 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#E7E1DA] transition-all">
@@ -373,17 +441,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </Link>
             </nav>
 
-            {/* Install App CTA */}
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))}
-              className="hidden xl:inline-flex items-center gap-1.5 px-3 h-8 rounded-full border border-[#E7E1DA] hover:border-[#C85A32] text-xs font-semibold text-[#57423b] hover:text-[#C85A32] hover:bg-[#F4EFEB] transition-all cursor-pointer shrink-0 whitespace-nowrap"
-              title="Install MTShoots as an App"
-            >
-              <Download className="w-3.5 h-3.5 text-[#C85A32] shrink-0" />
-              <span>Install App</span>
-            </button>
-
             {/* Book a Shoot CTA */}
             {onOpenNewBooking && (
               <Button
@@ -411,11 +468,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full border border-[#E7E1DA] hover:border-[#C85A32]/50 bg-white hover:bg-[#FAF8F5] transition-all cursor-pointer shadow-xs"
                 >
                   <div className="relative">
-                    <img
-                      src={userAvatarImage}
-                      alt={user.fullName}
-                      className="w-7 h-7 rounded-full object-cover ring-2 ring-[#C85A32]/30"
-                    />
+                    {hasUserAvatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.fullName}
+                        className="w-7 h-7 rounded-full object-cover ring-2 ring-[#C85A32]/30"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-[#FAF8F5] border border-[#E7E1DA] flex items-center justify-center text-[#C85A32] ring-2 ring-[#C85A32]/20">
+                        <User className="w-3.5 h-3.5" />
+                      </div>
+                    )}
                     <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-[#2D593E] ring-1 ring-white" />
                   </div>
                   <span className="text-xs font-bold text-[#181615] truncate max-w-[90px]">
@@ -437,11 +500,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                       {/* User Header */}
                       <div className="p-3 bg-[#FAF8F5] rounded-xl mb-1 border border-[#E7E1DA]/60">
                         <div className="flex items-center gap-2.5">
-                          <img
-                            src={userAvatarImage}
-                            alt={user.fullName}
-                            className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-xs"
-                          />
+                          {hasUserAvatar ? (
+                            <img
+                              src={user.avatar}
+                              alt={user.fullName}
+                              className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-xs"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-white border border-[#E7E1DA] flex items-center justify-center text-[#C85A32] shadow-xs">
+                              <User className="w-5 h-5" />
+                            </div>
+                          )}
                           <div className="truncate">
                             <div className="text-xs font-bold text-[#181615] truncate">{user.fullName}</div>
                             <div className="text-[11px] text-[#8a726a] truncate">{user.email}</div>
@@ -535,7 +604,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               {user && (
                 <div className="p-3 bg-[#FAF8F5] rounded-xl mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <img src={userAvatarImage} alt={user.fullName} className="w-8 h-8 rounded-full object-cover" />
+                    {hasUserAvatar ? (
+                      <img src={user.avatar} alt={user.fullName} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-white border border-[#E7E1DA] flex items-center justify-center text-[#C85A32]">
+                        <User className="w-4 h-4" />
+                      </div>
+                    )}
                     <div>
                       <div className="text-xs font-bold text-[#181615]">{user.fullName}</div>
                       <div className="text-[10px] text-[#8a726a]">{user.email}</div>
@@ -667,83 +742,121 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Tab 1: Profile */}
             {settingsTab === 'profile' && (
               <form onSubmit={handleSaveSettings} className="space-y-4 overflow-y-auto pr-1 flex-1">
-                {/* Avatar Picker */}
-                <div className="text-center space-y-2.5">
-                  <div className="relative inline-block mx-auto">
-                    <img
-                      src={settingsAvatar || PRESET_USER_AVATARS[0]}
-                      alt="Avatar Preview"
-                      className="w-16 h-16 rounded-full object-cover ring-4 ring-[#C85A32]/20 shadow-sm"
+                {/* Avatar & Photo Picker */}
+                <AvatarPicker
+                  value={settingsAvatar}
+                  onChange={setSettingsAvatar}
+                  label='Profile Photo (Optional)'
+                  helperText='Upload your custom photo or leave empty for default profile icon'
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Full Legal Name</label>
+                    <Input
+                      value={settingsName}
+                      onChange={(e) => setSettingsName(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
+                      required
                     />
-                    <label
-                      className="absolute bottom-0 right-0 p-1.5 rounded-full bg-[#C85A32] text-white cursor-pointer hover:bg-[#b04a25] shadow-md transition-transform hover:scale-105"
-                      title="Upload profile photo from device"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              if (typeof reader.result === 'string') {
-                                setSettingsAvatar(reader.result);
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                        className="hidden"
+                  </div>
+
+                  {user?.role === 'photographer' && (
+                    <div>
+                      <label className="block text-xs font-bold text-[#181615] mb-1">Brand / Studio Name</label>
+                      <Input
+                        value={settingsBrandName}
+                        onChange={(e) => setSettingsBrandName(e.target.value)}
+                        placeholder="e.g. Lumina Studio Arts"
                       />
-                    </label>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Phone Number</label>
+                    <Input
+                      value={settingsPhone}
+                      onChange={(e) => setSettingsPhone(e.target.value)}
+                      placeholder="e.g. +91 98765 43210"
+                    />
                   </div>
 
-                  <div className="text-[11px] text-[#8a726a]">
-                    Upload custom photo or select a preset:
-                  </div>
-                  <div className="flex items-center justify-center gap-2">
-                    {PRESET_USER_AVATARS.map((av, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setSettingsAvatar(av)}
-                        className={'w-8 h-8 rounded-full overflow-hidden border-2 transition-all cursor-pointer ' + (settingsAvatar === av ? 'border-[#C85A32] scale-110 ring-2 ring-[#C85A32]/20' : 'border-transparent opacity-70 hover:opacity-100')}
-                      >
-                        <img src={av} alt="Preset" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Base City</label>
+                    <Input
+                      value={settingsCity}
+                      onChange={(e) => setSettingsCity(e.target.value)}
+                      placeholder="e.g. Mumbai, Maharashtra"
+                    />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1">Full Legal Name</label>
-                  <Input
-                    value={settingsName}
-                    onChange={(e) => setSettingsName(e.target.value)}
-                    placeholder="e.g. Rahul Sharma"
-                    required
-                  />
-                </div>
+                {user?.role === 'photographer' && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Primary Discipline</label>
+                        <select
+                          value={settingsGenre}
+                          onChange={(e) => setSettingsGenre(e.target.value)}
+                          className="w-full h-9 rounded-xl border border-[#E7E1DA] bg-white px-3 py-1 text-xs text-[#181615] focus:outline-none focus:ring-2 focus:ring-[#C85A32]"
+                        >
+                          <option value="Wedding">Wedding Photography</option>
+                          <option value="Pre-Wedding">Pre-Wedding & Couple Portraits</option>
+                          <option value="Fashion">Fashion & Lookbook Editorial</option>
+                          <option value="Commercial">Commercial & Advertising</option>
+                          <option value="Product">Product & E-Commerce</option>
+                          <option value="Architecture">Architecture & Interior</option>
+                          <option value="Portrait">Corporate & Portraiture</option>
+                          <option value="Food">Food & Beverage</option>
+                        </select>
+                      </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1">Phone Number</label>
-                  <Input
-                    value={settingsPhone}
-                    onChange={(e) => setSettingsPhone(e.target.value)}
-                    placeholder="e.g. +91 98765 43210"
-                  />
-                </div>
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Starting Day Rate (₹ INR)</label>
+                        <Input
+                          type="number"
+                          min="5000"
+                          step="1000"
+                          value={settingsStartingRate}
+                          onChange={(e) => setSettingsStartingRate(Number(e.target.value))}
+                          placeholder="e.g. 40000"
+                        />
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1">City</label>
-                  <Input
-                    value={settingsCity}
-                    onChange={(e) => setSettingsCity(e.target.value)}
-                    placeholder="e.g. Mumbai, Maharashtra"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-xs font-bold text-[#181615] mb-1">Professional Bio</label>
+                      <textarea
+                        value={settingsBio}
+                        onChange={(e) => setSettingsBio(e.target.value)}
+                        rows={3}
+                        placeholder="Describe your photography journey, creative vision, and client experience..."
+                        className="w-full rounded-xl border border-[#E7E1DA] bg-white p-3 text-xs text-[#181615] focus:outline-none focus:ring-2 focus:ring-[#C85A32] leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Camera Bodies & Gear</label>
+                        <Input
+                          value={settingsCameraBodies}
+                          onChange={(e) => setSettingsCameraBodies(e.target.value)}
+                          placeholder="e.g. Sony A7 IV, Canon EOS R5"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Prime & Zoom Lenses</label>
+                        <Input
+                          value={settingsLenses}
+                          onChange={(e) => setSettingsLenses(e.target.value)}
+                          placeholder="e.g. 24-70mm f/2.8, 85mm f/1.4"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-[#E7E1DA]">
                   <Button

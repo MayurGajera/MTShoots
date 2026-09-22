@@ -12,6 +12,7 @@ import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { INITIAL_BOOKINGS, INITIAL_PHOTOGRAPHERS } from '../data/photographers';
 import { ShimmerBookingCard } from '../components/ShimmerCard';
+import { PhotographerDashboard } from '../components/PhotographerDashboard';
 
 const STATUS_CONFIG: Record<BookingRequest['status'], { label: string; color: string; icon: React.FC<any>; bg: string }> = {
   confirmed: { label: 'Confirmed', color: 'text-[#2D593E]', bg: 'bg-[#EAF4ED]', icon: CheckCircle2 },
@@ -30,6 +31,19 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
   photographers: propPhotographers,
   onOpenNewBooking
 }) => {
+  // Check if logged in user is a photographer
+  const [currentUser] = useState<any>(() => {
+    try {
+      if (typeof window === 'undefined') return null;
+      const stored = localStorage.getItem('mtshoots_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
+  });
+
+  if (currentUser?.role === 'photographer') {
+    return <PhotographerDashboard user={currentUser} onOpenNewBooking={onOpenNewBooking} />;
+  }
+
   // Load from localStorage if not passed as props
   const [bookings] = useState<BookingRequest[]>(() => {
     if (propBookings) return propBookings;

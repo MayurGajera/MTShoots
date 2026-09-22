@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Photographer, BookingRequest } from '../types';
-import { INITIAL_PHOTOGRAPHERS, INITIAL_BOOKINGS } from '../data/photographers';
+import { INITIAL_PHOTOGRAPHERS, INITIAL_BOOKINGS, getAllPhotographers, getStoredRegisteredPhotographers } from '../data/photographers';
 
 // Environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -178,26 +178,30 @@ export async function testSupabaseConnection(): Promise<{
 export async function loadPhotographers(): Promise<Photographer[]> {
   const client = getSupabaseClient();
   if (!client) {
-    return INITIAL_PHOTOGRAPHERS;
+    return getAllPhotographers();
   }
 
   try {
     const { data, error } = await client.from('photographers').select('*');
     if (error || !data || data.length === 0) {
-      return INITIAL_PHOTOGRAPHERS;
+      return getAllPhotographers();
     }
 
-    // Map database snake_case columns to TypeScript camelCase if needed
-    return data.map((row: any) => ({
+    // Map database snake_case columns to TypeScript camelCase
+    const remoteList: Photographer[] = data.map((row: any) => ({
       id: row.id,
       name: row.name,
       location: row.location,
       baseCity: row.base_city || row.baseCity || row.location,
+      officeLocation: row.office_location || undefined,
+      officeAddress: row.office_address || undefined,
+      officeMapUrl: row.office_map_url || undefined,
       avatar: row.avatar,
       heroImage: row.hero_image || row.heroImage,
+      coverImage: row.hero_image || row.heroImage,
       primaryCategory: row.primary_category || row.primaryCategory || (row.specialties?.[0] || 'Commercial & Advertising'),
       specialties: row.specialties || [],
-      experienceLevel: (row.experience_level || row.experienceLevel || 'professional') as 'beginner' | 'professional' | 'master',
+      experienceLevel: (row.experience_level || row.experienceLevel || 'professional') as any,
       experienceYears: Number(row.experience_years || row.experienceYears) || 6,
       rating: Number(row.rating) || 4.95,
       reviewCount: Number(row.review_count) || 0,
@@ -210,13 +214,137 @@ export async function loadPhotographers(): Promise<Photographer[]> {
       awards: row.awards || [],
       equipment: row.equipment || [],
       cameraFormat: row.camera_format || row.cameraFormat || '',
-      turnaroundDays: row.turnaround_days || 3,
+      homeSliderPhotos: row.home_slider_photos || [],
+      turnaroundDays: Number(row.turnaround_days) || 3,
       assistantIncluded: row.assistant_included ?? true,
       portfolio: row.portfolio || []
     }));
+
+    // Merge with any locally stored registered photographers so new profiles always appear
+    const localRegistered = getStoredRegisteredPhotographers();
+    const combined = [...remoteList];
+    for (const local of localRegistered) {
+      if (!combined.some(c => c.id === local.id)) {
+        combined.unshift(local);
+      }
+    }
+    return combined.length > 0 ? combined : getAllPhotographers();
   } catch (err) {
-    console.warn('Failed to fetch photographers from Supabase, falling back to initial data:', err);
-    return INITIAL_PHOTOGRAPHERS;
+    console.warn('Failed to fetch photographers from Supabase, falling back to all local:', err);
+    return getAllPhotographers();
+  }
+}
+
+/**
+ * Save / Upsert Photographer to Supabase database
+ */
+export async function savePhotographerToSupabase(photographer: Photographer): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const record = {
+      id: photographer.id,
+      name: photographer.name,
+      location: photographer.location || (photographer.baseCity ? (photographer.baseCity + ', India') : 'Mumbai, India'),
+      base_city: photographer.baseCity || photographer.location?.split(',')[0]?.trim() || 'Mumbai',
+      office_location: photographer.officeLocation || null,
+      office_address: photographer.officeAddress || null,
+      office_map_url: photographer.officeMapUrl || null,
+      avatar: photographer.avatar,
+      hero_image: photographer.heroImage || photographer.coverImage || photographer.portfolio?.[0]?.imageUrl || photographer.avatar,
+      primary_category: photographer.primaryCategory || photographer.specialties?.[0] || 'Commercial & Advertising',
+      specialties: photographer.specialties || [photographer.primaryCategory].filter(Boolean),
+      experience_level: photographer.experienceLevel || 'professional',
+      experience_years: Number(photographer.experienceYears) || 5,
+      rating: Number(photographer.rating) || 4.95,
+      review_count: Number(photographer.reviewCount) || 1,
+      day_rate: Number(photographer.dayRate) || 85000,
+      half_day_rate: Number(photographer.halfDayRate) || Math.round((Number(photographer.dayRate) || 85000) * 0.6),
+      available_now: photographer.availableNow ?? true,
+      next_available_date: photographer.nextAvailableDate || new Date().toISOString().split('T')[0],
+      client_roster: photographer.clientRoster || [],
+      bio: photographer.bio || '',
+      awards: photographer.awards || [],
+      equipment: photographer.equipment || [],
+      camera_format: photographer.cameraFormat || '',
+      home_slider_photos: photographer.homeSliderPhotos || [],
+      turnaround_days: Number(photographer.turnaroundDays) || 3,
+      assistant_included: photographer.assistantIncluded ?? true,
+      portfolio: photographer.portfolio || [],
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await client
+      .from('photographers')
+      .upsert(record, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('savePhotographerToSupabase error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('savePhotographerToSupabase exception:', err);
+    return false;
+  }
+}
+
+/**
+ * Fetch a single Photographer by ID or Slug with fallback
+ */
+export async function getPhotographerById(id: string): Promise<Photographer | null> {
+  // 1. Check local memory and registered profiles first for instant render
+  const localList = getAllPhotographers();
+  const localMatch = localList.find(p => p.id === id || p.id === decodeURIComponent(id));
+  if (localMatch) return localMatch;
+
+  // 2. Query Supabase database
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from('photographers')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      name: data.name,
+      location: data.location,
+      baseCity: data.base_city || data.baseCity || data.location,
+      officeLocation: data.office_location,
+      officeAddress: data.office_address,
+      officeMapUrl: data.office_map_url,
+      avatar: data.avatar,
+      heroImage: data.hero_image,
+      coverImage: data.hero_image,
+      primaryCategory: data.primary_category || data.specialties?.[0] || 'Commercial & Advertising',
+      specialties: data.specialties || [],
+      experienceLevel: (data.experience_level || 'professional') as any,
+      experienceYears: Number(data.experience_years) || 5,
+      rating: Number(data.rating) || 4.95,
+      reviewCount: Number(data.review_count) || 0,
+      dayRate: Number(data.day_rate) || 85000,
+      halfDayRate: Number(data.half_day_rate) || 50000,
+      availableNow: data.available_now ?? true,
+      nextAvailableDate: data.next_available_date || new Date().toISOString().split('T')[0],
+      clientRoster: data.client_roster || [],
+      bio: data.bio || '',
+      awards: data.awards || [],
+      equipment: data.equipment || [],
+      cameraFormat: data.camera_format || '',
+      homeSliderPhotos: data.home_slider_photos || [],
+      turnaroundDays: Number(data.turnaround_days) || 3,
+      assistantIncluded: data.assistant_included ?? true,
+      portfolio: data.portfolio || []
+    };
+  } catch {
+    return null;
   }
 }
 

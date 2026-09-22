@@ -18,7 +18,7 @@ import { LocationPickerModal } from './components/LocationPickerModal';
 import { ScrollToTop } from './components/ScrollToTop';
 import { ScrollToTopButton } from './components/ScrollToTopButton';
 import { ApertureLoader } from './components/ApertureLoader';
-import { INITIAL_PHOTOGRAPHERS, INITIAL_BOOKINGS } from './data/photographers';
+import { INITIAL_PHOTOGRAPHERS, INITIAL_BOOKINGS, getAllPhotographers } from './data/photographers';
 import { BookingRequest, Photographer, ShootDurationType, UsageRightsTier } from './types';
 import { isSupabaseConfigured, saveBookingToSupabase } from './lib/supabase';
 import { useScrollLock } from './hooks/useScrollLock';
@@ -74,7 +74,7 @@ function AnimatedRoutes({
           <Route path="/bookings" element={
             <BookingsPage
               bookings={bookings}
-              photographers={INITIAL_PHOTOGRAPHERS}
+              photographers={getAllPhotographers()}
               onOpenNewBooking={openNewBooking}
             />
           } />
@@ -158,7 +158,7 @@ export default function App() {
     setBookings(updated);
     setIsBookingModalOpen(false);
     setBookingConfig(null);
-    triggerToast('Booking confirmed! View your bookings â†'');
+    triggerToast('Booking confirmed! View your bookings');
     if (isSupabaseConfigured()) {
       saveBookingToSupabase(newBooking).catch(() => {});
     }
@@ -233,7 +233,7 @@ export default function App() {
       {isBookingModalOpen && (
         <BookingSheetModal
           initialConfig={bookingConfig}
-          photographers={INITIAL_PHOTOGRAPHERS}
+          photographers={getAllPhotographers()}
           onClose={() => { setIsBookingModalOpen(false); setBookingConfig(null); }}
           onConfirmBooking={handleConfirmBooking}
         />
