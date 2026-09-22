@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface ApertureLoaderProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   label?: string;
   fullScreen?: boolean;
 }
@@ -12,42 +12,33 @@ export const ApertureLoader: React.FC<ApertureLoaderProps> = ({
   fullScreen = false
 }) => {
   const sizeMap = {
-    sm: 'w-8 h-8',
-    md: 'w-12 h-12',
-    lg: 'w-16 h-16'
+    sm: 'w-10 h-10',
+    md: 'w-16 h-16',
+    lg: 'w-24 h-24',
+    xl: 'w-32 h-32',
   };
 
   const loader = (
-    <div className="flex flex-col items-center justify-center gap-4">
-      <div className={`relative ${sizeMap[size]}`} aria-label="Loading" role="status">
-        {/* Outer ring */}
-        <div
-          className="absolute inset-0 rounded-full border-2 border-[#C85A32]/20"
-          style={{ animation: 'aperture-spin 2s linear infinite reverse' }}
+    <div className="flex flex-col items-center justify-center gap-3 select-none">
+      <div className={`relative ${sizeMap[size]} flex items-center justify-center`} aria-label="Loading" role="status">
+        <img
+          src="/camera-loader.svg"
+          alt="Camera loading animation"
+          className="w-full h-full object-contain drop-shadow-sm"
+          loading="eager"
         />
-        {/* Inner aperture blades */}
-        <div
-          className={`aperture-loader ${sizeMap[size]}`}
-          aria-hidden="true"
-        >
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="aperture-loader-blade" />
-          ))}
-        </div>
-        {/* Center dot */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-2 h-2 rounded-full bg-[#C85A32] opacity-80" />
-        </div>
       </div>
       {label && (
-        <p className="text-xs text-[#8a726a] font-medium animate-pulse">{label}</p>
+        <p className="font-sans text-xs text-[#8a726a] font-semibold tracking-wide uppercase animate-pulse text-center">
+          {label}
+        </p>
       )}
     </div>
   );
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 z-50 bg-[#FAF8F5]/90 backdrop-blur-sm flex items-center justify-center">
+      <div className="fixed inset-0 z-[300] bg-[#FAF8F5]/95 backdrop-blur-md flex items-center justify-center">
         {loader}
       </div>
     );
@@ -56,11 +47,14 @@ export const ApertureLoader: React.FC<ApertureLoaderProps> = ({
   return loader;
 };
 
-/** Inline button spinner — tiny aperture for button loading states */
-export const ButtonSpinner: React.FC<{ className?: string }> = ({ className = '' }) => (
-  <div
-    className={`inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full ${className}`}
-    style={{ animation: 'aperture-spin 0.7s linear infinite' }}
-    aria-hidden="true"
-  />
+/** Inline button spinner  -  tiny aperture for button loading states */
+export const ButtonSpinner: React.FC<{ className?: string; text?: string }> = ({ className = '', text }) => (
+  <span className="inline-flex items-center gap-2">
+    <div
+      className={`inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full ${className}`}
+      style={{ animation: 'aperture-spin 0.7s linear infinite' }}
+      aria-hidden="true"
+    />
+    {text && <span>{text}</span>}
+  </span>
 );

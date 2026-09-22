@@ -1,7 +1,14 @@
-const CACHE_NAME = 'mtshoots-v1';
+const CACHE_NAME = 'mtshoots-v2';
 const STATIC_ASSETS = [
   '/',
-  '/manifest.json'
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-192-maskable.png',
+  '/icons/icon-512.png',
+  '/icons/icon-512-maskable.png',
+  '/icons/apple-touch-icon.png',
+  '/favicon-32x32.png',
+  '/favicon.ico'
 ];
 
 // Install: cache static assets
@@ -48,7 +55,6 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => cached);
 
-      // Return cache immediately if available, fetch in background
       return cached || fetchPromise;
     })
   );

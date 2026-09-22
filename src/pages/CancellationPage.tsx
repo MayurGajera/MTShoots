@@ -50,25 +50,25 @@ export const CancellationPage: React.FC = () => {
                   <tr className="bg-white hover:bg-[#FAF8F5]/50 transition-colors">
                     <td className="p-4 font-semibold text-[#181615]">More than 7 days prior</td>
                     <td className="p-4 text-[#2D593E] font-bold">100% Full Refund</td>
-                    <td className="p-4">3–5 Business Days</td>
+                    <td className="p-4">3 - 5 Business Days</td>
                     <td className="p-4 text-[#8a726a]">Minus standard payment gateway fee (2%)</td>
                   </tr>
                   <tr className="bg-white hover:bg-[#FAF8F5]/50 transition-colors">
                     <td className="p-4 font-semibold text-[#181615]">3 to 7 days prior</td>
                     <td className="p-4 text-[#C85A32] font-bold">75% Refund</td>
-                    <td className="p-4">3–5 Business Days</td>
+                    <td className="p-4">3 - 5 Business Days</td>
                     <td className="p-4 text-[#8a726a]">25% retained for artist date lock</td>
                   </tr>
                   <tr className="bg-white hover:bg-[#FAF8F5]/50 transition-colors">
                     <td className="p-4 font-semibold text-[#181615]">48 to 72 hours prior</td>
                     <td className="p-4 text-[#C85A32] font-bold">50% Refund</td>
-                    <td className="p-4">3–5 Business Days</td>
+                    <td className="p-4">3 - 5 Business Days</td>
                     <td className="p-4 text-[#8a726a]">Half-rate reserved date compensation</td>
                   </tr>
                   <tr className="bg-white hover:bg-[#FAF8F5]/50 transition-colors">
                     <td className="p-4 font-semibold text-[#181615]">Under 48 hours / No-Show</td>
                     <td className="p-4 text-[#181615] font-bold">No Refund</td>
-                    <td className="p-4">—</td>
+                    <td className="p-4"> - </td>
                     <td className="p-4 text-[#8a726a]">Full session rate paid to artist</td>
                   </tr>
                 </tbody>

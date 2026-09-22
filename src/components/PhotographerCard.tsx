@@ -130,7 +130,7 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
         <img
           key={sliderImages[currentIndex]}
           src={sliderImages[currentIndex]}
-          alt={`${photographer.name} — ${photographer.primaryCategory} photography`}
+          alt={`${photographer.name}  -  ${photographer.primaryCategory} photography`}
           className={`relative z-10 w-full h-full object-cover object-top transition-all duration-700 group-hover:scale-105 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           loading="lazy"
           referrerPolicy="no-referrer"

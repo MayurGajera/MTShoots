@@ -1,8 +1,9 @@
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { X, Calendar, MapPin, Clock, User, Mail, FileText, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Photographer, BookingRequest, ShootDurationType, UsageRightsTier } from '../types';
 import { AVAILABLE_ADDONS } from '../data/photographers';
+import { fetchAddOns, DbAddOn } from '@/lib/supabase';
 import { formatINR } from '../utils/format';
 import { useScrollLock } from '../hooks/useScrollLock';
 
@@ -28,6 +29,21 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
   onConfirmBooking
 }) => {
   useScrollLock(true);
+
+  const [addOnsList, setAddOnsList] = useState(AVAILABLE_ADDONS);
+
+  useEffect(() => {
+    fetchAddOns().then(dbAddOns => {
+      if (dbAddOns && dbAddOns.length > 0) {
+        setAddOnsList(dbAddOns.map(a => ({
+          id: a.id,
+          name: a.name,
+          price: a.price,
+          description: a.description || ''
+        })));
+      }
+    }).catch(() => {});
+  }, []);
 
   const defaultPhotographer = initialConfig?.photographer || photographers[0];
 
@@ -86,7 +102,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
   const usageCost = Math.round(currentPhotographer.dayRate * usageMultiplier);
 
   const addOnsCost = selectedAddOns.reduce((sum, id) => {
-    const item = AVAILABLE_ADDONS.find((a) => a.id === id);
+    const item = addOnsList.find((a) => a.id === id);
     return sum + (item ? item.price : 0);
   }, 0);
 
@@ -177,7 +193,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
             >
               {photographers.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} — {formatINR(p.dayRate)}/day ({p.location})
+                  {p.name}  -  {formatINR(p.dayRate)}/day ({p.location})
                 </option>
               ))}
             </select>

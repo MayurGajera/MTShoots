@@ -29,6 +29,12 @@ function InnerShell({ children }: { children: React.ReactNode }) {
   } = useApp();
 
   const [isAppLoading, setIsAppLoading] = useState(true);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }, []);
+
 
   useEffect(() => {
     const handleOpenLoc = () => setShowLocationPicker(true);

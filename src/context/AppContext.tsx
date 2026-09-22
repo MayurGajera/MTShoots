@@ -104,7 +104,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBookings(updated);
     setIsBookingModalOpen(false);
     setBookingConfig(null);
-    triggerToast('Booking confirmed! View your bookings â†’');
+    triggerToast('Booking confirmed! View your bookings');
     if (isSupabaseConfigured()) {
       saveBookingToSupabase(newBooking).catch(() => {});
     }
@@ -126,7 +126,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('mtshoots_city', city);
     } catch {}
     setShowLocationPicker(false);
-    triggerToast(`Showing photographers near ${city} ðŸ“ `);
+    triggerToast(`Showing photographers near ${city} ðŸ" `);
   };
 
   return (

@@ -16,9 +16,8 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: 'MTShoots â€” Discover & Book Top Professional Photographers in India',
-  description:
-    'MTShoots connects you with verified, award-winning photographers across India. Transparent pricing, real-time availability, instant quotes, and verified portfolios for weddings, fashion, corporate shoots, and more.',
+  title: 'MTShoots - Discover and Book Top Professional Photographers in India',
+  description: 'MTShoots connects you with verified professional photographers across India.',
   keywords: [
     'photographer booking',
     'hire photographer India',
@@ -30,7 +29,7 @@ export const metadata: Metadata = {
   authors: [{ name: 'MTShoots' }],
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   openGraph: {
-    title: "MTShoots â€” India's Premier Photography Network",
+    title: 'MTShoots - India Photography Network',
     description:
       "Book India's finest verified photographers with upfront rates and instant booking.",
     url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
@@ -48,8 +47,19 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MTShoots â€” Book Verified Photographers Across India',
+    title: 'MTShoots - India Photography Network',
     description: 'Find verified photographers, compare portfolios, and book effortlessly.',
+  },
+  manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
   },
 };
 
@@ -60,11 +70,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={plusJakarta.variable + ' ' + playfair.variable}>
-      <head>
+            <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <meta name="theme-color" content="#C85A32" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="MTShoots" />
       </head>
-      <body className="font-sans antialiased bg-[#FAF8F5] text-[#181615]">
+      <body className="font-sans antialiased bg-[#FAF8F5] text-[#181615] max-w-full overflow-x-clip">
         <ClientShell>{children}</ClientShell>
       </body>
     </html>

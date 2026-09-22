@@ -158,7 +158,7 @@ export default function App() {
     setBookings(updated);
     setIsBookingModalOpen(false);
     setBookingConfig(null);
-    triggerToast('Booking confirmed! View your bookings â†’');
+    triggerToast('Booking confirmed! View your bookings â†'');
     if (isSupabaseConfigured()) {
       saveBookingToSupabase(newBooking).catch(() => {});
     }
@@ -178,7 +178,7 @@ export default function App() {
     setSelectedCity(city);
     try { localStorage.setItem('mtshoots_city', city); } catch {}
     setShowLocationPicker(false);
-    triggerToast(`Showing photographers near ${city} ðŸ“`);
+    triggerToast(`Showing photographers near ${city} ðŸ"`);
   };
 
   // App loading screen

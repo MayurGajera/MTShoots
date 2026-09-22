@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Camera, X, Download, Share2, Smartphone } from 'lucide-react';
+import { Download, X, Share2, Smartphone, Star, ShieldCheck, Check, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -13,37 +13,40 @@ export const PwaInstallBanner: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
-  const [showIosGuide, setShowIosGuide] = useState(false);
-
-  const [isDismissed, setIsDismissed] = useState(() => {
-    try { if (typeof window === 'undefined') return false;
-      return localStorage.getItem('mtshoots_pwa_dismissed') === 'true'; } catch { return false; }
-  });
-
-  const isIos = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
 
   useEffect(() => {
     // Check if already in standalone PWA mode
-    if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
+    if (
+      typeof window !== 'undefined' &&
+      (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone)
+    ) {
       setIsInstalled(true);
       return;
     }
 
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const iosDevice = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+    const androidDevice = /Android/.test(ua);
+    const isMobile = iosDevice || androidDevice || (typeof window !== 'undefined' && window.innerWidth < 768);
+
+    setIsIos(iosDevice);
+    setIsAndroid(androidDevice);
+
+    // Register beforeinstallprompt event for Chrome / Edge
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      if (!isDismissed) {
-        // Show after a brief delay so page loads smoothly first
-        setTimeout(() => setIsVisible(true), 1500);
-      }
-    };
-
-    const handleManualOpen = () => {
-      setIsVisible(true);
-      setShowIosGuide(isIos);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+
+    // Manual trigger from navbar or anywhere
+    const handleManualOpen = () => {
+      setIsVisible(true);
+    };
     window.addEventListener('open-pwa-install', handleManualOpen);
 
     window.addEventListener('appinstalled', () => {
@@ -52,13 +55,25 @@ export const PwaInstallBanner: React.FC = () => {
       setTimeout(() => setIsVisible(false), 2500);
     });
 
+    // On mobile devices, show the install popup automatically after a 1.2s welcoming delay
+    let timer: NodeJS.Timeout;
+    if (isMobile) {
+      const dismissedRecently = sessionStorage.getItem('mtshoots_pwa_dismissed_session');
+      if (!dismissedRecently) {
+        timer = setTimeout(() => {
+          setIsVisible(true);
+        }, 1200);
+      }
+    }
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
       window.removeEventListener('open-pwa-install', handleManualOpen);
+      clearTimeout(timer);
     };
-  }, [isDismissed, isIos]);
+  }, []);
 
-  const handleInstall = async () => {
+  const handleInstallClick = async () => {
     if (deferredPrompt) {
       setIsInstalling(true);
       try {
@@ -66,107 +81,158 @@ export const PwaInstallBanner: React.FC = () => {
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
           setIsInstalled(true);
+          setIsVisible(false);
         }
-      } catch {
-        // Handled gracefully
-      }
+      } catch {}
       setIsInstalling(false);
       setDeferredPrompt(null);
     } else if (isIos) {
-      setShowIosGuide(true);
+      setShowInstructions(true);
     } else {
-      // Browser doesn't support beforeinstallprompt yet or already triggered
-      alert('To install MTShoots: Open your browser menu (⋮) and select "Install App" or "Add to Home screen".');
+      // Android or other mobile where beforeinstallprompt already fired or needs instructions
+      setShowInstructions(true);
     }
   };
 
   const handleDismiss = () => {
     setIsVisible(false);
-    setIsDismissed(true);
-    try { localStorage.setItem('mtshoots_pwa_dismissed', 'true'); } catch {}
+    setShowInstructions(false);
+    sessionStorage.setItem('mtshoots_pwa_dismissed_session', 'true');
   };
 
-  if (!isVisible && !showIosGuide) return null;
+  if (!isVisible && !showInstructions) return null;
 
   return (
     <AnimatePresence>
-      <motion.aside
-        initial={{ opacity: 0, y: 30, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 20, scale: 0.95 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
-        aria-label="Install MTShoots on Mobile"
-        className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-50 bg-white/98 backdrop-blur-xl rounded-2xl p-5 border-2 border-[#E7E1DA] shadow-2xl"
-      >
-        <div className="flex items-start gap-3.5">
-          {/* Terracotta Camera Badge */}
-          <div className="w-11 h-11 rounded-xl bg-[#C85A32] flex items-center justify-center text-white shrink-0 shadow-md shadow-[#C85A32]/25">
-            <Camera className="w-6 h-6" />
-          </div>
-
-          <div className="flex-1 min-w-0">
-            {/* Title & Close */}
-            <div className="flex items-start justify-between gap-2">
-              <h4 className="font-serif text-base font-bold text-[#181615] leading-snug">
-                {isInstalled ? 'MTShoots App Installed!' : 'Install MTShoots on Mobile'}
-              </h4>
-              <button
-                type="button"
-                onClick={handleDismiss}
-                className="text-[#8a726a] hover:text-[#181615] p-1 -mr-1.5 -mt-1 cursor-pointer transition-colors"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
+      <div className="fixed inset-0 z-[250] flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs pointer-events-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 50, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 40, scale: 0.95 }}
+          transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+          role="dialog"
+          aria-label="Download MTShoots PWA App"
+          className="bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl border-2 border-[#E7E1DA] overflow-hidden"
+        >
+          {/* Header row with App Icon, Info & Close button */}
+          <div className="flex items-start gap-4">
+            {/* High-Resolution App Icon */}
+            <div className="relative shrink-0">
+              <img
+                src="/icons/icon-192.png"
+                alt="MTShoots App Icon"
+                className="w-16 h-16 rounded-2xl shadow-md ring-2 ring-[#C85A32]/25 object-cover bg-[#181615]"
+                onError={(e) => {
+                  // Fallback to favicon
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white" title="Verified App">
+                <Check className="w-3 h-3 stroke-[3]" />
+              </div>
             </div>
 
-            {/* Description */}
-            <p className="text-xs text-[#57423b] mt-1 leading-relaxed">
-              {isInstalled
-                ? 'App is added to your home screen with offline sync ready.'
-                : 'Add MTShoots to your mobile home screen for immediate offline call sheet access on shoot day.'}
-            </p>
-
-            {/* iOS Safari Installation Steps */}
-            {showIosGuide && (
-              <div className="mt-3 p-3 rounded-xl bg-[#FAF8F5] border border-[#E7E1DA] text-xs text-[#181615] space-y-1.5">
-                <div className="font-semibold text-[#C85A32] flex items-center gap-1.5">
-                  <Smartphone className="w-3.5 h-3.5" /> For iPhone &amp; iPad:
+            {/* App Title & Details */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-1">
+                <div>
+                  <div className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-[#C85A32] mb-0.5">
+                    <Sparkles className="w-3 h-3" />
+                    <span>Official Mobile App</span>
+                  </div>
+                  <h3 className="font-serif text-lg font-bold text-[#181615] leading-tight">
+                    MTShoots
+                  </h3>
                 </div>
-                <div className="flex items-center gap-2 text-[11px] text-[#57423b]">
-                  1. Tap the <Share2 className="w-3.5 h-3.5 text-[#C85A32] inline" /> <strong>Share</strong> button in Safari toolbar
-                </div>
-                <div className="text-[11px] text-[#57423b]">
-                  2. Scroll down and tap <strong>Add to Home Screen</strong>
-                </div>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            {!isInstalled && (
-              <div className="mt-4 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleInstall}
-                  disabled={isInstalling}
-                  className="px-4 py-2.5 rounded-xl bg-[#C85A32] hover:bg-[#B24E2A] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#C85A32]/25 flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
-                >
-                  <Download className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>{isInstalling ? 'Installing...' : 'ADD TO HOMESCREEN'}</span>
-                </button>
-
                 <button
                   type="button"
                   onClick={handleDismiss}
-                  className="text-xs font-semibold text-[#8a726a] hover:text-[#181615] transition-colors cursor-pointer py-2 px-1"
+                  aria-label="Close"
+                  className="w-7 h-7 rounded-full bg-[#FAF8F5] hover:bg-[#F4EFEB] flex items-center justify-center text-[#8a726a] hover:text-[#181615] transition-colors -mr-1 -mt-1 cursor-pointer"
                 >
-                  Maybe Later
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            )}
+
+              {/* Rating & Category */}
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center text-amber-500 text-xs">
+                  <Star className="w-3 h-3 fill-amber-400 stroke-amber-400" />
+                  <span className="font-bold ml-1 text-[#181615]">4.9</span>
+                </div>
+                <span className="text-[#8a726a] text-xs">•</span>
+                <span className="text-xs text-[#8a726a]">Photography & Shoots</span>
+              </div>
+            </div>
           </div>
-        </div>
-      </motion.aside>
+
+          {/* Value Prop Features */}
+          <div className="mt-4 p-3 bg-[#FAF8F5] rounded-2xl border border-[#E7E1DA] space-y-1.5 text-xs text-[#57423b]">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Instant 1-tap launch from your phone home screen</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-3.5 h-3.5 text-[#C85A32] shrink-0" />
+              <span>Offline access to call sheets and booking details</span>
+            </div>
+          </div>
+
+          {/* Installation Instructions for iOS / Android */}
+          {showInstructions && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mt-3 p-3.5 rounded-2xl bg-[#FFF6F3] border border-[#FADCD1] text-xs text-[#181615] space-y-2"
+            >
+              {isIos ? (
+                <>
+                  <div className="font-bold text-[#C85A32] flex items-center gap-1.5 text-xs">
+                    <Share2 className="w-3.5 h-3.5" /> How to install on iPhone / iPad:
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-[#57423b]">
+                    <li>Tap the <strong>Share</strong> icon in the bottom Safari toolbar</li>
+                    <li>Scroll down and tap <strong>Add to Home Screen</strong></li>
+                    <li>Tap <strong>Add</strong> in top right corner</li>
+                  </ol>
+                </>
+              ) : (
+                <>
+                  <div className="font-bold text-[#C85A32] flex items-center gap-1.5 text-xs">
+                    <Download className="w-3.5 h-3.5" /> How to install on Android:
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-[#57423b]">
+                    <li>Tap the Chrome menu (<strong>⋮</strong> three dots) at the top right</li>
+                    <li>Tap <strong>Install app</strong> or <strong>Add to Home screen</strong></li>
+                    <li>Confirm installation to get the app icon</li>
+                  </ol>
+                </>
+              )}
+            </motion.div>
+          )}
+
+          {/* Actions */}
+          <div className="mt-5 flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              disabled={isInstalling}
+              className="flex-1 py-3 px-4 rounded-xl bg-[#C85A32] hover:bg-[#B24E2A] active:scale-[0.98] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#C85A32]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+            >
+              <Download className="w-4 h-4 stroke-[2.5]" />
+              <span>{isInstalling ? 'Installing...' : 'Install App'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="py-3 px-4 rounded-xl border border-[#E7E1DA] hover:bg-[#FAF8F5] text-xs font-bold text-[#8a726a] hover:text-[#181615] transition-colors cursor-pointer"
+            >
+              Maybe Later
+            </button>
+          </div>
+        </motion.div>
+      </div>
     </AnimatePresence>
   );
 };
