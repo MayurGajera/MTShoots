@@ -25,7 +25,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { MTShootsLogo } from './MTShootsLogo';
 import { AvatarPicker } from './AvatarPicker';
-import { getUserByEmail, upsertUser, getUserAddresses, addUserAddress, deleteUserAddress, getUserDevices, deactivateDevice, DbUserAddress, DbUserDevice } from '@/lib/supabase';
+import { getUserByEmail, upsertUser, savePhotographerToSupabase, getUserAddresses, addUserAddress, deleteUserAddress, getUserDevices, deactivateDevice, DbUserAddress, DbUserDevice } from '@/lib/supabase';
 
 interface NavbarProps {
   currentTab?: 'roster' | 'callsheets' | 'shortlist';
@@ -101,6 +101,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [settingsCity, setSettingsCity] = useState('');
   const [settingsAvatar, setSettingsAvatar] = useState('');
 
+  // Photographer specific settings states
+  const [settingsBrandName, setSettingsBrandName] = useState('');
+  const [settingsGenre, setSettingsGenre] = useState('Wedding');
+  const [settingsBio, setSettingsBio] = useState('');
+  const [settingsStartingRate, setSettingsStartingRate] = useState<number>(40000);
+  const [settingsCameraBodies, setSettingsCameraBodies] = useState('');
+  const [settingsLenses, setSettingsLenses] = useState('');
+
   // Password change states
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -171,6 +179,20 @@ export const Navbar: React.FC<NavbarProps> = ({
       setSettingsPhone(user.phone || '');
       setSettingsCity(user.city || currentCity);
       setSettingsAvatar(user.avatar || '');
+      if (user.role === 'photographer') {
+        try {
+          const storedProfile = localStorage.getItem('mtshoots_photographer_profile');
+          if (storedProfile) {
+            const p = JSON.parse(storedProfile);
+            setSettingsBrandName(p.brandName || p.name || user.fullName || '');
+            setSettingsGenre(p.primaryDiscipline || p.discipline || p.genre || 'Wedding');
+            setSettingsBio(p.bio || '');
+            setSettingsStartingRate(Number(p.startingDayRate || p.startingRate || 40000));
+            setSettingsCameraBodies(Array.isArray(p.equipment?.cameraBodies) ? p.equipment.cameraBodies.join(', ') : (p.gear || ''));
+            setSettingsLenses(Array.isArray(p.equipment?.lenses) ? p.equipment.lenses.join(', ') : '');
+          }
+        } catch {}
+      }
       if (user.email) {
         loadUserAccountData(user.email);
       }
@@ -262,6 +284,39 @@ export const Navbar: React.FC<NavbarProps> = ({
       });
     } catch (err) {
       console.warn('Could not sync user profile update to Supabase:', err);
+    }
+
+    if (user.role === 'photographer') {
+      try {
+        let existingProfile: any = {};
+        const storedProfile = localStorage.getItem('mtshoots_photographer_profile');
+        if (storedProfile) {
+          existingProfile = JSON.parse(storedProfile);
+        }
+        const updatedPhotographer = {
+          ...existingProfile,
+          name: trimmedName,
+          brandName: settingsBrandName.trim() || trimmedName,
+          phone: settingsPhone.trim(),
+          city: settingsCity.trim() || currentCity,
+          avatar: settingsAvatar || '',
+          primaryDiscipline: settingsGenre,
+          startingDayRate: Number(settingsStartingRate) || 40000,
+          bio: settingsBio.trim(),
+          gear: settingsCameraBodies.trim(),
+          equipment: {
+            cameraBodies: settingsCameraBodies.split(',').map(s => s.trim()).filter(Boolean),
+            lenses: settingsLenses.split(',').map(s => s.trim()).filter(Boolean)
+          }
+        };
+        localStorage.setItem('mtshoots_photographer_profile', JSON.stringify(updatedPhotographer));
+        window.dispatchEvent(new CustomEvent('photographers-updated'));
+        try {
+          await savePhotographerToSupabase(updatedPhotographer);
+        } catch {}
+      } catch (err) {
+        console.warn('Could not sync photographer profile update:', err);
+      }
     }
 
     setIsSettingsOpen(false);
@@ -695,33 +750,113 @@ export const Navbar: React.FC<NavbarProps> = ({
                   helperText='Upload your custom photo or leave empty for default profile icon'
                 />
 
-                <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1">Full Legal Name</label>
-                  <Input
-                    value={settingsName}
-                    onChange={(e) => setSettingsName(e.target.value)}
-                    placeholder="e.g. Rahul Sharma"
-                    required
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Full Legal Name</label>
+                    <Input
+                      value={settingsName}
+                      onChange={(e) => setSettingsName(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
+                      required
+                    />
+                  </div>
+
+                  {user?.role === 'photographer' && (
+                    <div>
+                      <label className="block text-xs font-bold text-[#181615] mb-1">Brand / Studio Name</label>
+                      <Input
+                        value={settingsBrandName}
+                        onChange={(e) => setSettingsBrandName(e.target.value)}
+                        placeholder="e.g. Lumina Studio Arts"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Phone Number</label>
+                    <Input
+                      value={settingsPhone}
+                      onChange={(e) => setSettingsPhone(e.target.value)}
+                      placeholder="e.g. +91 98765 43210"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Base City</label>
+                    <Input
+                      value={settingsCity}
+                      onChange={(e) => setSettingsCity(e.target.value)}
+                      placeholder="e.g. Mumbai, Maharashtra"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1">Phone Number</label>
-                  <Input
-                    value={settingsPhone}
-                    onChange={(e) => setSettingsPhone(e.target.value)}
-                    placeholder="e.g. +91 98765 43210"
-                  />
-                </div>
+                {user?.role === 'photographer' && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Primary Discipline</label>
+                        <select
+                          value={settingsGenre}
+                          onChange={(e) => setSettingsGenre(e.target.value)}
+                          className="w-full h-9 rounded-xl border border-[#E7E1DA] bg-white px-3 py-1 text-xs text-[#181615] focus:outline-none focus:ring-2 focus:ring-[#C85A32]"
+                        >
+                          <option value="Wedding">Wedding Photography</option>
+                          <option value="Pre-Wedding">Pre-Wedding & Couple Portraits</option>
+                          <option value="Fashion">Fashion & Lookbook Editorial</option>
+                          <option value="Commercial">Commercial & Advertising</option>
+                          <option value="Product">Product & E-Commerce</option>
+                          <option value="Architecture">Architecture & Interior</option>
+                          <option value="Portrait">Corporate & Portraiture</option>
+                          <option value="Food">Food & Beverage</option>
+                        </select>
+                      </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1">City</label>
-                  <Input
-                    value={settingsCity}
-                    onChange={(e) => setSettingsCity(e.target.value)}
-                    placeholder="e.g. Mumbai, Maharashtra"
-                  />
-                </div>
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Starting Day Rate (₹ INR)</label>
+                        <Input
+                          type="number"
+                          min="5000"
+                          step="1000"
+                          value={settingsStartingRate}
+                          onChange={(e) => setSettingsStartingRate(Number(e.target.value))}
+                          placeholder="e.g. 40000"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#181615] mb-1">Professional Bio</label>
+                      <textarea
+                        value={settingsBio}
+                        onChange={(e) => setSettingsBio(e.target.value)}
+                        rows={3}
+                        placeholder="Describe your photography journey, creative vision, and client experience..."
+                        className="w-full rounded-xl border border-[#E7E1DA] bg-white p-3 text-xs text-[#181615] focus:outline-none focus:ring-2 focus:ring-[#C85A32] leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Camera Bodies & Gear</label>
+                        <Input
+                          value={settingsCameraBodies}
+                          onChange={(e) => setSettingsCameraBodies(e.target.value)}
+                          placeholder="e.g. Sony A7 IV, Canon EOS R5"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Prime & Zoom Lenses</label>
+                        <Input
+                          value={settingsLenses}
+                          onChange={(e) => setSettingsLenses(e.target.value)}
+                          placeholder="e.g. 24-70mm f/2.8, 85mm f/1.4"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-[#E7E1DA]">
                   <Button

@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MTShootsLogo } from '../components/MTShootsLogo';
 import { ButtonSpinner } from '../components/ApertureLoader';
 import { AvatarPicker } from '../components/AvatarPicker';
+import { PhotographerWizard } from '../components/PhotographerWizard';
 import { upsertUser, getUserByEmail } from '../lib/supabase';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
@@ -476,27 +477,43 @@ export const AuthPage: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Photographer Callout Banner */}
-                {role === 'photographer' && (
-                  <div className="mb-6 p-4 rounded-2xl bg-[#FFF6F2] border border-[#F4C5B5] text-[#9F3C16] text-xs space-y-2">
-                    <div className="font-bold flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-[#C85A32]" />
-                      <span>5-Step Photographer Onboarding</span>
-                    </div>
-                    <p className="text-[11px] text-[#8a726a] leading-relaxed">
-                      Showcase multiple portfolio photos, camera gear specs, and custom rate cards on our dedicated artist application portal.
-                    </p>
-                    <Link
-                      to="/photographers/apply"
-                      className="inline-flex items-center gap-1.5 font-bold text-xs text-[#C85A32] hover:underline"
-                    >
-                      <span>Open 5-Step Artist Onboarding Wizard</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                )}
+                {role === 'photographer' && mode === 'signup' ? (
+                  <div className="w-full">
+                    {/* Title & Tabs */}
+                    <div className="text-center mb-6">
+                      <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#181615]">
+                        Register as Professional Photographer
+                      </h1>
+                      <p className="text-xs text-[#8a726a] mt-1">
+                        Complete your 5-step registration with portfolio, rates, and gear details to start receiving client enquiries
+                      </p>
 
-                {/* Title & Tabs */}
+                      <div className="flex justify-center gap-6 mt-4 border-b border-[#E7E1DA]">
+                        <button
+                          type="button"
+                          onClick={() => { setMode('login'); setError(null); }}
+                          className="pb-3 text-xs font-bold transition-colors cursor-pointer text-[#8a726a] hover:text-[#181615]"
+                        >
+                          Sign In
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setMode('signup'); setError(null); }}
+                          className="pb-3 text-xs font-bold transition-colors cursor-pointer text-[#C85A32] border-b-2 border-[#C85A32]"
+                        >
+                          Create Account
+                        </button>
+                      </div>
+                    </div>
+
+                    <PhotographerWizard
+                      hideHeader={true}
+                      onSwitchToLogin={() => setMode('login')}
+                    />
+                  </div>
+                ) : (
+                  <div>
+{/* Title & Tabs */}
                 <div className="text-center mb-6">
                   <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#181615]">
                     {role === 'photographer'
@@ -702,6 +719,8 @@ export const AuthPage: React.FC = () => {
                     )}
                   </button>
                 </form>
+                  </div>
+                )}
               </div>
             )}
           </div>

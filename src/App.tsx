@@ -158,7 +158,7 @@ export default function App() {
     setBookings(updated);
     setIsBookingModalOpen(false);
     setBookingConfig(null);
-    triggerToast('Booking confirmed! View your bookings â†'');
+    triggerToast('Booking confirmed! View your bookings');
     if (isSupabaseConfigured()) {
       saveBookingToSupabase(newBooking).catch(() => {});
     }
