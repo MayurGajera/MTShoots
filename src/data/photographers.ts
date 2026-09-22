@@ -1022,3 +1022,30 @@ export const INITIAL_BOOKINGS: BookingRequest[] = [
     shotListOverview: 'Shot 01: Dawn light through peacock arch with Banarasi silk drape. Shot 02: Polki necklace close-up in marble colonnade. Shot 03-08: Samode fresco mirror hall portraits with soft continuous tungsten fill.'
   }
 ];
+
+// Helpers for registered dynamic photographers
+export function getStoredRegisteredPhotographers(): Photographer[] {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('mtshoots_registered_photographers') : null;
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveRegisteredPhotographer(photographer: Photographer): void {
+  try {
+    if (typeof window === 'undefined') return;
+    const existing = getStoredRegisteredPhotographers();
+    const updated = [photographer, ...existing.filter(p => p.id !== photographer.id)];
+    localStorage.setItem('mtshoots_registered_photographers', JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('photographers-updated'));
+  } catch (err) {
+    console.error('Failed to save photographer to storage:', err);
+  }
+}
+
+export function getAllPhotographers(): Photographer[] {
+  const registered = getStoredRegisteredPhotographers();
+  return [...registered, ...INITIAL_PHOTOGRAPHERS];
+}

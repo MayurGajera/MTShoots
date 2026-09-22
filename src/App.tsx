@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react';
+﻿import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { LandingPage } from './pages/LandingPage';
@@ -10,6 +10,7 @@ import { AuthPage } from './pages/AuthPage';
 import { TermsPage } from './pages/TermsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { CancellationPage } from './pages/CancellationPage';
+import { PhotographerApplyPage } from './pages/PhotographerApplyPage';
 import { PwaNav } from './components/PwaNav';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { BookingSheetModal } from './components/BookingSheetModal';
@@ -56,7 +57,7 @@ function AnimatedRoutes({
       >
         <Routes location={location}>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/photographers" element={<PhotographersPage />} />
+          <Route path="/photographers" element={<PhotographersPage />} />`n          <Route path="/photographers/apply" element={<PhotographerApplyPage />} />
           <Route path="/photographers/:id" element={
             <PhotographerProfilePage
               onOpenBooking={onOpenBooking}
@@ -157,7 +158,7 @@ export default function App() {
     setBookings(updated);
     setIsBookingModalOpen(false);
     setBookingConfig(null);
-    triggerToast('Booking confirmed! View your bookings →');
+    triggerToast('Booking confirmed! View your bookings â†’');
     if (isSupabaseConfigured()) {
       saveBookingToSupabase(newBooking).catch(() => {});
     }
@@ -177,7 +178,7 @@ export default function App() {
     setSelectedCity(city);
     try { localStorage.setItem('mtshoots_city', city); } catch {}
     setShowLocationPicker(false);
-    triggerToast(`Showing photographers near ${city} 📍`);
+    triggerToast(`Showing photographers near ${city} ðŸ“`);
   };
 
   // App loading screen
