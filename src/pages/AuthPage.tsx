@@ -482,24 +482,24 @@ export const AuthPage: React.FC = () => {
                     {/* Title & Tabs */}
                     <div className="text-center mb-6">
                       <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#181615]">
-                        Register as Professional Photographer
+                        Create Artist Account
                       </h1>
                       <p className="text-xs text-[#8a726a] mt-1">
-                        Complete your 5-step registration with portfolio, rates, and gear details to start receiving client enquiries
+                        Showcase your portfolio to top commercial & event clients
                       </p>
 
                       <div className="flex justify-center gap-6 mt-4 border-b border-[#E7E1DA]">
                         <button
                           type="button"
                           onClick={() => { setMode('login'); setError(null); }}
-                          className="pb-3 text-xs font-bold transition-colors cursor-pointer text-[#8a726a] hover:text-[#181615]"
+                          className="pb-2.5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer border-b-2 -mb-px border-transparent text-[#8a726a] hover:text-[#181615]"
                         >
                           Sign In
                         </button>
                         <button
                           type="button"
                           onClick={() => { setMode('signup'); setError(null); }}
-                          className="pb-3 text-xs font-bold transition-colors cursor-pointer text-[#C85A32] border-b-2 border-[#C85A32]"
+                          className="pb-2.5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer border-b-2 -mb-px border-[#C85A32] text-[#C85A32]"
                         >
                           Create Account
                         </button>

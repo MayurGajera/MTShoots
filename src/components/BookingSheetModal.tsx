@@ -266,6 +266,11 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
                 <input
                   type="date"
                   required
+                  min={(() => {
+                    const d = new Date();
+                    d.setMonth(d.getMonth() - 6);
+                    return d.toISOString().split('T')[0];
+                  })()}
                   value={shootDate}
                   onChange={(e) => setShootDate(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E7E1DA] text-sm text-[#181615] focus:outline-none focus:border-[#C85A32]"

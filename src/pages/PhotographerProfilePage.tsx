@@ -721,7 +721,11 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
                 <input
                   type="date"
                   value={selectedDate}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={(() => {
+                    const d = new Date();
+                    d.setMonth(d.getMonth() - 6);
+                    return d.toISOString().split('T')[0];
+                  })()}
                   onChange={e => setSelectedDate(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-[#E7E1DA] text-sm text-[#181615] focus:outline-none focus:border-[#C85A32] bg-[#FAF8F5]"
                 />

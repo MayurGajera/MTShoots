@@ -109,20 +109,20 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
-  // Step 2: Disciplines & Equipment (clean initial state)
+  // Step 2: Disciplines & Equipment
   const [primaryGenre, setPrimaryGenre] = useState('Wedding & Pre-Wedding');
-  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
-  const [cameraBodies, setCameraBodies] = useState('');
-  const [lenses, setLenses] = useState('');
-  const [lighting, setLighting] = useState('');
-  const [droneGear, setDroneGear] = useState('');
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>(['Wedding', 'Pre-Wedding']);
+  const [cameraBodies, setCameraBodies] = useState('Sony A7 IV, Canon EOS R5');
+  const [lenses, setLenses] = useState('24-70mm f/2.8 GM, 85mm f/1.4');
+  const [lighting, setLighting] = useState('Profoto B10X, Godox AD200');
+  const [droneGear, setDroneGear] = useState('DJI Mavic 3 Pro');
 
-  // Step 3: Packages & Rates
-  const [standardTitle, setStandardTitle] = useState('');
-  const [standardRate, setStandardRate] = useState<number | ''>('');
-  const [standardHours, setStandardHours] = useState<number | ''>('');
-  const [standardDeliverables, setStandardDeliverables] = useState('');
-  const [turnaroundDays, setTurnaroundDays] = useState<number | ''>('');
+  // Step 3: Packages & Rates (sensible defaults)
+  const [standardTitle, setStandardTitle] = useState('Full-Day Creative Production');
+  const [standardRate, setStandardRate] = useState<number | ''>(45000);
+  const [standardHours, setStandardHours] = useState<number | ''>(8);
+  const [standardDeliverables, setStandardDeliverables] = useState('40-50 high-res retouched images, online gallery, full usage rights');
+  const [turnaroundDays, setTurnaroundDays] = useState<number | ''>(5);
 
   // Validation functions
   const validateStep1 = () => {
@@ -130,25 +130,33 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
     if (!fullName.trim() || fullName.trim().length < 2) {
       errs.fullName = 'Please enter your full legal name (at least 2 characters)';
     }
-    if (!brandName.trim() || brandName.trim().length < 2) {
-      errs.brandName = 'Please enter your studio / brand name';
+    if (brandName.trim() && brandName.trim().length < 2) {
+      errs.brandName = 'Brand name must be at least 2 characters';
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim() || !emailRegex.test(email.trim())) {
-      errs.email = 'Please enter a valid email address';
+      errs.email = 'Please enter a valid email address (e.g. you@example.com)';
     }
     const cleanPhone = phone.replace(/\D/g, '');
     if (!phone.trim() || cleanPhone.length < 10) {
-      errs.phone = 'Please enter a valid 10-digit phone number';
+      errs.phone = 'Please enter a valid 10-digit mobile phone number';
+    }
+    if (!password || password.length < 6) {
+      errs.password = 'Password must be at least 6 characters long';
+    }
+    if (password && confirmPassword && password !== confirmPassword) {
+      errs.confirmPassword = 'Passwords do not match';
+    } else if (!confirmPassword && password) {
+      errs.confirmPassword = 'Please confirm your password';
+    }
+    if (!startingRate || Number(startingRate) <= 0) {
+      errs.startingRate = 'Please enter a starting rate per shoot (INR)';
     }
     if (!city) {
       errs.city = 'Please select your base operational city';
     }
-    if (!startingRate || Number(startingRate) <= 0) {
-      errs.startingRate = 'Please enter your starting rate per shoot';
-    }
-    if (!bio.trim() || bio.trim().length < 20) {
-      errs.bio = 'Please provide a short artist statement (at least 20 characters)';
+    if (bio.trim() && bio.trim().length < 10) {
+      errs.bio = 'Please provide a short artist statement (at least 10 characters)';
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -156,11 +164,8 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
 
   const validateStep2 = () => {
     const errs: Record<string, string> = {};
-    if (selectedSpecialties.length === 0) {
-      errs.specialties = 'Please select at least 1 specialty';
-    }
     if (!cameraBodies.trim() || cameraBodies.trim().length < 2) {
-      errs.cameraBodies = 'Please specify your primary camera bodies and formats';
+      errs.cameraBodies = 'Please specify your primary camera gear';
     }
     if (!lenses.trim() || lenses.trim().length < 2) {
       errs.lenses = 'Please specify your primary lenses';
@@ -194,7 +199,29 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
   };
 
   // Step 4: Visual Showcase & Multiple Photos
-  const [portfolioPhotos, setPortfolioPhotos] = useState<UploadedPhoto[]>([]);
+  const [portfolioPhotos, setPortfolioPhotos] = useState<UploadedPhoto[]>([
+    {
+      id: 'photo-1',
+      url: 'https://images.unsplash.com/photo-1606800052052-a08af7148866?auto=format&fit=crop&w=1200&q=85',
+      caption: 'Heritage Palace Wedding Ceremony',
+      tag: 'Wedding',
+      isCover: true
+    },
+    {
+      id: 'photo-2',
+      url: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1200&q=85',
+      caption: 'Golden Hour Pre-Wedding Portraits',
+      tag: 'Pre-Wedding',
+      isCover: false
+    },
+    {
+      id: 'photo-3',
+      url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=85',
+      caption: 'Fashion Editorial Campaign',
+      tag: 'Fashion',
+      isCover: false
+    }
+  ]);
 
   const handlePortfolioFilesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -482,16 +509,50 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Full Legal Name *</label>
-                  <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Rahul Sharma" />
+                  <Input
+                    value={fullName}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      if (errors.fullName) setErrors(prev => ({ ...prev, fullName: "" }));
+                    }}
+                    placeholder="e.g. Rahul Sharma"
+                    autoComplete="off"
+                    className={errors.fullName ? "border-red-500 ring-1 ring-red-400" : ""}
+                  />
+                  {errors.fullName && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.fullName}</p>}
                 </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1.5">Brand / Studio Name</label>
-                  <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. Lumina Studios" />
+                  <label className="block text-xs font-bold text-[#181615] mb-1.5">Brand / Studio Name (Optional)</label>
+                  <Input
+                    value={brandName}
+                    onChange={(e) => {
+                      setBrandName(e.target.value);
+                      if (errors.brandName) setErrors(prev => ({ ...prev, brandName: "" }));
+                    }}
+                    placeholder="e.g. Lumina Studios (leave blank if individual)"
+                    autoComplete="off"
+                    className={errors.brandName ? "border-red-500 ring-1 ring-red-400" : ""}
+                  />
+                  {errors.brandName && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.brandName}</p>}
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Email Address *</label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. rahul.sharma@example.com" />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errors.email) setErrors(prev => ({ ...prev, email: "" }));
+                    }}
+                    placeholder="e.g. rahul.sharma@example.com"
+                    autoComplete="off"
+                    className={errors.email ? "border-red-500 ring-1 ring-red-400" : ""}
+                  />
+                  {errors.email && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.email}</p>}
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Mobile Phone (WhatsApp) *</label>
                   <Input
@@ -501,10 +562,12 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                       if (errors.phone) setErrors(prev => ({ ...prev, phone: "" }));
                     }}
                     placeholder="+91 98765 43210"
+                    autoComplete="off"
                     className={errors.phone ? "border-red-500 ring-1 ring-red-400" : ""}
                   />
                   {errors.phone && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.phone}</p>}
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Password *</label>
                   <div className="relative">
@@ -528,6 +591,7 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                   </div>
                   {errors.password && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.password}</p>}
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Confirm Password *</label>
                   <div className="relative">
@@ -551,8 +615,9 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                   </div>
                   {errors.confirmPassword && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.confirmPassword}</p>}
                 </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1.5">Starting Day Rate (INR ?) *</label>
+                  <label className="block text-xs font-bold text-[#181615] mb-1.5">Starting Day Rate (₹ INR) *</label>
                   <Input
                     type="number"
                     value={startingRate}
@@ -565,6 +630,7 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                   />
                   {errors.startingRate && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.startingRate}</p>}
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Base Operational City *</label>
                   <select
@@ -579,9 +645,10 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                   </select>
                   {errors.city && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.city}</p>}
                 </div>
-                <div>
+
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Years of Professional Experience</label>
-                  <Input type="number" value={experienceYears} onChange={(e) => setExperienceYears(Number(e.target.value))} min={1} max={40} />
+                  <Input type="number" value={experienceYears} onChange={(e) => setExperienceYears(Number(e.target.value))} placeholder="e.g. 5" min={1} max={40} />
                 </div>
               </div>
 
@@ -589,17 +656,21 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                 <label className="block text-xs font-bold text-[#181615] mb-1.5">Professional Bio & Artist Statement</label>
                 <textarea
                   value={bio}
-                  onChange={(e) => setBio(e.target.value)}
+                  onChange={(e) => {
+                    setBio(e.target.value);
+                    if (errors.bio) setErrors(prev => ({ ...prev, bio: "" }));
+                  }}
                   rows={4}
                   placeholder="Tell clients about your artistic philosophy, signature aesthetic, memorable assignments..."
-                  className="w-full p-3 rounded-2xl border border-[#E7E1DA] bg-white text-xs text-[#181615] focus:outline-none focus:border-[#C85A32]"
+                  className={"w-full p-3 rounded-2xl border bg-white text-xs text-[#181615] focus:outline-none " + (errors.bio ? "border-red-500 ring-1 ring-red-400" : "border-[#E7E1DA] focus:border-[#C85A32]")}
                 />
+                {errors.bio && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.bio}</p>}
               </div>
 
               <div className="flex justify-end pt-4 border-t border-[#E7E1DA]">
                 <Button
                   onClick={() => { if (validateStep1()) { setErrors({}); setCurrentStep(2); } }}
-                  className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2"
+                  className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2 cursor-pointer shadow-sm"
                 >
                   <span>Continue to Gear & Disciplines</span>
                   <ArrowRight className="w-4 h-4" />
@@ -644,12 +715,30 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
 
               <div className="space-y-4 pt-2">
                 <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1.5">Camera Bodies & Formats</label>
-                  <Input value={cameraBodies} onChange={(e) => setCameraBodies(e.target.value)} placeholder="e.g. Sony A7R V, Hasselblad X2D, Canon EOS R5" />
+                  <label className="block text-xs font-bold text-[#181615] mb-1.5">Camera Bodies & Formats *</label>
+                  <Input
+                    value={cameraBodies}
+                    onChange={(e) => {
+                      setCameraBodies(e.target.value);
+                      if (errors.cameraBodies) setErrors(prev => ({ ...prev, cameraBodies: "" }));
+                    }}
+                    placeholder="e.g. Sony A7R V, Hasselblad X2D, Canon EOS R5"
+                    className={errors.cameraBodies ? "border-red-500 ring-1 ring-red-400" : ""}
+                  />
+                  {errors.cameraBodies && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.cameraBodies}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1.5">Prime & Zoom Lenses</label>
-                  <Input value={lenses} onChange={(e) => setLenses(e.target.value)} placeholder="e.g. 24-70mm f/2.8 GM II, 85mm f/1.4" />
+                  <label className="block text-xs font-bold text-[#181615] mb-1.5">Prime & Zoom Lenses *</label>
+                  <Input
+                    value={lenses}
+                    onChange={(e) => {
+                      setLenses(e.target.value);
+                      if (errors.lenses) setErrors(prev => ({ ...prev, lenses: "" }));
+                    }}
+                    placeholder="e.g. 24-70mm f/2.8 GM II, 85mm f/1.4"
+                    className={errors.lenses ? "border-red-500 ring-1 ring-red-400" : ""}
+                  />
+                  {errors.lenses && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.lenses}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Lighting & Modifiers</label>
@@ -684,16 +773,45 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                 <div className="text-xs font-bold text-[#C85A32] uppercase tracking-wider">Standard Flagship Package</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#181615] mb-1.5">Package Title</label>
-                    <Input value={standardTitle} onChange={(e) => setStandardTitle(e.target.value)} />
+                    <label className="block text-xs font-bold text-[#181615] mb-1.5">Package Title *</label>
+                    <Input
+                      value={standardTitle}
+                      onChange={(e) => {
+                        setStandardTitle(e.target.value);
+                        if (errors.standardTitle) setErrors(prev => ({ ...prev,  standardTitle: "" }));
+                      }}
+                      className={errors.standardTitle ? "border-red-500 ring-1 ring-red-400" : ""}
+                    />
+                    {errors.standardTitle && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.standardTitle}</p>}
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#181615] mb-1.5">Price (₹ INR)</label>
-                    <Input type="number" value={standardRate} onChange={(e) => setStandardRate(Number(e.target.value))} step={5000} />
+                    <label className="block text-xs font-bold text-[#181615] mb-1.5">Price (₉ INR) *</label>
+                    <Input
+                      type="number"
+                      value={standardRate}
+                      onChange={(e) => {
+                        setStandardRate(Number(e.target.value));
+                        if (errors.standardRate) setErrors(prev => ({ ...prev, standardRate: "" }));
+                      }}
+                      step={5000}
+                      className={errors.standardRate ? "border-red-500 ring-1 ring-red-400" : ""}
+                    />
+                    {errors.standardRate && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.standardRate}</p>}
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#181615] mb-1.5">Coverage Duration (Hours)</label>
-                    <Input type="number" value={standardHours} onChange={(e) => setStandardHours(Number(e.target.value))} min={2} max={18} />
+                    <label className="block text-xs font-bold text-[#181615] mb-1.5">Coverage Duration (Hours) *</label>
+                    <Input
+                      type="number"
+                      value={standardHours}
+                      onChange={(e) => {
+                        setStandardHours(Number(e.target.value));
+                        if (errors.standardHours) setErrors(prev => ({ ...prev, standardHours: "" }));
+                      }}
+                      min={2}
+                      max={18}
+                      className={errors.standardHours ? "border-red-500 ring-1 ring-red-400" : ""}
+                    />
+                    {errors.standardHours && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.standardHours}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-[#181615] mb-1.5">Turnaround Time (Business Days)</label>
@@ -845,6 +963,7 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                 <Button variant="outline" onClick={() => setCurrentStep(3)} className="text-xs font-semibold">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back
                 </Button>
+              {errors.portfolio && <p className="text-xs text-red-600 font-semibold mb-3">{errors.portfolio}</p>}
                 <Button onClick={() => { if (validateStep4()) { setErrors({}); setCurrentStep(5); } }} className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2">
                   <span>Continue to Review</span>
                   <ArrowRight className="w-4 h-4" />

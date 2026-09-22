@@ -352,7 +352,11 @@ export const LandingPage: React.FC = () => {
                   <input
                     type="date"
                     value={searchDate}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={(() => {
+                      const d = new Date();
+                      d.setMonth(d.getMonth() - 6);
+                      return d.toISOString().split('T')[0];
+                    })()}
                     onChange={e => setSearchDate(e.target.value)}
                     className="w-full bg-transparent text-xs font-bold text-[#181615] focus:outline-none cursor-pointer"
                   />
