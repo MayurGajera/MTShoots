@@ -9,7 +9,9 @@ import {
   Sliders, ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { INITIAL_PHOTOGRAPHERS, AVAILABLE_ADDONS } from '../data/photographers';
+import { INITIAL_PHOTOGRAPHERS, AVAILABLE_ADDONS, getAllPhotographers } from '../data/photographers';
+import { getPhotographerById } from '../lib/supabase';
+import { ApertureLoader } from '../components/ApertureLoader';
 import { Photographer, PortfolioItem, ShootDurationType, UsageRightsTier } from '../types';
 import { formatINR } from '../utils/format';
 import { Navbar } from '../components/Navbar';
@@ -17,7 +19,7 @@ import { Footer } from '../components/Footer';
 import { MediaLightbox } from '../components/MediaLightbox';
 
 interface PhotographerProfilePageProps {
-  onOpenBooking: (config: {
+  onOpenBooking?: (config: {
     photographer: Photographer;
     selectedDate: string;
     durationType: ShootDurationType;
@@ -26,19 +28,56 @@ interface PhotographerProfilePageProps {
     totalCost: number;
     shootLocation: string;
   }) => void;
-  shortlistIds: string[];
-  onToggleSave: (id: string) => void;
+  shortlistIds?: string[];
+  onToggleSave?: (id: string) => void;
 }
 
 export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = ({
   onOpenBooking,
-  shortlistIds,
-  onToggleSave
+  shortlistIds: propShortlistIds,
+  onToggleSave: propOnToggleSave
 }) => {
+  const app = useApp();
+  const shortlistIds = propShortlistIds ?? app?.shortlistIds ?? [];
+  const onToggleSave = propOnToggleSave ?? app?.onToggleSave ?? (() => {});
+  const effectiveOpenBooking = onOpenBooking ?? app?.openBooking ?? (() => {});
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const photographer = INITIAL_PHOTOGRAPHERS.find(p => p.id === id);
+  const [photographer, setPhotographer] = useState<Photographer | null>(() => {
+    const all = getAllPhotographers();
+    return all.find(p => p.id === id || p.id === decodeURIComponent(id || '')) || null;
+  });
+  const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(!photographer);
+
+  useEffect(() => {
+    let isMounted = true;
+    const local = getAllPhotographers().find(p => p.id === id || p.id === decodeURIComponent(id || ''));
+    if (local) {
+      setPhotographer(local);
+      setIsLoadingProfile(false);
+    }
+
+    async function loadRemoteProfile() {
+      if (!id) return;
+      try {
+        const remote = await getPhotographerById(id);
+        if (isMounted && remote) {
+          setPhotographer(remote);
+        }
+      } catch (err) {
+        console.warn('Error fetching remote photographer profile:', err);
+      } finally {
+        if (isMounted) setIsLoadingProfile(false);
+      }
+    }
+
+    loadRemoteProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
 
   // Collect all photos for slider (hero image + homeSliderPhotos + portfolio items)
   const allPhotos: { url: string; title: string; category: string; specs?: string; item?: PortfolioItem }[] = React.useMemo(() => {
@@ -153,6 +192,18 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
     setCurrentIndex(prev => (prev - 1 + allPhotos.length) % allPhotos.length);
   }, [allPhotos.length]);
 
+  if (isLoadingProfile) {
+    return (
+      <div className='min-h-screen bg-[#FAF8F5] flex flex-col justify-between'>
+        <Navbar />
+        <div className='flex-1 flex flex-col items-center justify-center p-8'>
+          <ApertureLoader text='Loading photographer portfolio...' />
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
   if (!photographer) {
     return (
       <div className="min-h-screen bg-[#FAF8F5] flex flex-col justify-between">
@@ -177,7 +228,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
     );
   }
 
-  const isSaved = shortlistIds.includes(photographer.id);
+  const isSaved = photographer ? (shortlistIds || []).includes(photographer.id) : false;
 
   // Pricing calculations
   const halfDayPrice = photographer.halfDayRate || Math.round(photographer.dayRate * 0.6);
@@ -192,14 +243,14 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
 
   const handleStartBooking = () => {
     const cost = getPackagePrice(selectedPackage) + 5000; // includes base production
-    onOpenBooking({
+    effectiveOpenBooking({
       photographer,
       selectedDate,
       durationType: selectedPackage,
       usageRights: 'commercial-standard',
       selectedAddOns: [],
       totalCost: cost,
-      shootLocation: photographer.location
+      shootLocation: photographer.location || photographer.baseCity || 'Studio'
     });
   };
 
@@ -485,7 +536,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
                   Specializations & Styles
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {photographer.specialties.map(spec => (
+                  {(photographer.specialties || []).map(spec => (
                     <span
                       key={spec}
                       className="px-3 py-1 rounded-full text-xs bg-[#FAF8F5] border border-[#E7E1DA] text-[#181615] font-medium hover:border-[#C85A32] transition-colors"
@@ -510,7 +561,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-                {photographer.equipment.map((item, idx) => (
+                {(photographer.equipment || []).map((item, idx) => (
                   <div
                     key={idx}
                     className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#E7E1DA] flex items-center gap-3"
@@ -549,7 +600,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
                     Recognitions
                   </h4>
                   <ul className="space-y-2">
-                    {photographer.awards.map((award, i) => (
+                    {(photographer.awards || []).map((award, i) => (
                       <li key={i} className="text-xs text-[#57423b] flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#C85A32]" />
                         <span>{award}</span>
@@ -563,7 +614,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
                     Selected Brands &amp; Clients
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {photographer.clientRoster.map((client, i) => (
+                    {(photographer.clientRoster || []).map((client, i) => (
                       <span
                         key={i}
                         className="px-2.5 py-1 rounded-lg text-xs bg-[#FAF8F5] border border-[#E7E1DA] font-medium text-[#181615]"
@@ -584,12 +635,12 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
                   <p className="text-xs text-[#8a726a] mt-0.5">Click any image to view in high resolution lightbox</p>
                 </div>
                 <span className="text-xs font-mono text-[#8a726a] bg-[#FAF8F5] px-3 py-1 rounded-full border border-[#E7E1DA]">
-                  {photographer.portfolio.length} Projects
+                  {(photographer.portfolio || []).length} Projects
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {photographer.portfolio.map(item => (
+                {(photographer.portfolio || []).map(item => (
                   <div
                     key={item.id}
                     onClick={() => setLightboxItem(item)}
@@ -733,7 +784,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
       {lightboxItem && (
         <MediaLightbox
           item={lightboxItem}
-          allItems={photographer.portfolio}
+          allItems={photographer.portfolio || []}
           onClose={() => setLightboxItem(null)}
           onNavigate={item => setLightboxItem(item)}
           onBookSimilar={handleStartBooking}

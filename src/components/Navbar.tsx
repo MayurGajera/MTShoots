@@ -24,6 +24,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { MTShootsLogo } from './MTShootsLogo';
+import { AvatarPicker } from './AvatarPicker';
+import { DEFAULT_CARTOON_AVATAR } from '../data/avatars';
 import { getUserByEmail, upsertUser, getUserAddresses, addUserAddress, deleteUserAddress, getUserDevices, deactivateDevice, DbUserAddress, DbUserDevice } from '@/lib/supabase';
 
 interface NavbarProps {
@@ -45,7 +47,7 @@ interface UserProfile {
   phone?: string;
 }
 
-const PRESET_USER_AVATARS = [
+const PRESET_USER_AVATARS = [ DEFAULT_CARTOON_AVATAR, 
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
   'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
@@ -238,21 +240,40 @@ export const Navbar: React.FC<NavbarProps> = ({
     triggerToast('Device access revoked');
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    const trimmedName = settingsName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      triggerToast('Full name must be at least 2 characters');
+      return;
+    }
     const updated: UserProfile = {
       ...user,
-      fullName: settingsName,
-      phone: settingsPhone,
-      city: settingsCity,
-      avatar: settingsAvatar
+      fullName: trimmedName,
+      phone: settingsPhone.trim(),
+      city: settingsCity.trim() || currentCity,
+      avatar: settingsAvatar || DEFAULT_CARTOON_AVATAR
     };
     setUser(updated);
     localStorage.setItem('mtshoots_user', JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('mtshoots-auth-changed'));
+
+    try {
+      await upsertUser({
+        email: user.email,
+        full_name: trimmedName,
+        phone: settingsPhone.trim(),
+        city: settingsCity.trim() || currentCity,
+        avatar_url: settingsAvatar || DEFAULT_CARTOON_AVATAR,
+        role: user.role || 'customer'
+      });
+    } catch (err) {
+      console.warn('Could not sync user profile update to Supabase:', err);
+    }
+
     setIsSettingsOpen(false);
-    triggerToast('Account details updated successfully!');
+    triggerToast('Account profile updated in database successfully!');
   };
 
   const handleOpenPasswordModal = () => {
@@ -372,17 +393,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </Link>
             </nav>
-
-            {/* Install App CTA */}
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))}
-              className="hidden xl:inline-flex items-center gap-1.5 px-3 h-8 rounded-full border border-[#E7E1DA] hover:border-[#C85A32] text-xs font-semibold text-[#57423b] hover:text-[#C85A32] hover:bg-[#F4EFEB] transition-all cursor-pointer shrink-0 whitespace-nowrap"
-              title="Install MTShoots as an App"
-            >
-              <Download className="w-3.5 h-3.5 text-[#C85A32] shrink-0" />
-              <span>Install App</span>
-            </button>
 
             {/* Book a Shoot CTA */}
             {onOpenNewBooking && (
@@ -667,55 +677,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Tab 1: Profile */}
             {settingsTab === 'profile' && (
               <form onSubmit={handleSaveSettings} className="space-y-4 overflow-y-auto pr-1 flex-1">
-                {/* Avatar Picker */}
-                <div className="text-center space-y-2.5">
-                  <div className="relative inline-block mx-auto">
-                    <img
-                      src={settingsAvatar || PRESET_USER_AVATARS[0]}
-                      alt="Avatar Preview"
-                      className="w-16 h-16 rounded-full object-cover ring-4 ring-[#C85A32]/20 shadow-sm"
-                    />
-                    <label
-                      className="absolute bottom-0 right-0 p-1.5 rounded-full bg-[#C85A32] text-white cursor-pointer hover:bg-[#b04a25] shadow-md transition-transform hover:scale-105"
-                      title="Upload profile photo from device"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              if (typeof reader.result === 'string') {
-                                setSettingsAvatar(reader.result);
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="text-[11px] text-[#8a726a]">
-                    Upload custom photo or select a preset:
-                  </div>
-                  <div className="flex items-center justify-center gap-2">
-                    {PRESET_USER_AVATARS.map((av, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setSettingsAvatar(av)}
-                        className={'w-8 h-8 rounded-full overflow-hidden border-2 transition-all cursor-pointer ' + (settingsAvatar === av ? 'border-[#C85A32] scale-110 ring-2 ring-[#C85A32]/20' : 'border-transparent opacity-70 hover:opacity-100')}
-                      >
-                        <img src={av} alt="Preset" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Avatar & Photo Picker */}
+                <AvatarPicker
+                  value={settingsAvatar}
+                  onChange={setSettingsAvatar}
+                  label='Profile Photo or Cartoon Avatar'
+                  helperText='Upload your custom photo or choose a cartoon avatar'
+                />
 
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1">Full Legal Name</label>

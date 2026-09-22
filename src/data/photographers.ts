@@ -1040,6 +1040,15 @@ export function saveRegisteredPhotographer(photographer: Photographer): void {
     const updated = [photographer, ...existing.filter(p => p.id !== photographer.id)];
     localStorage.setItem('mtshoots_registered_photographers', JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('photographers-updated'));
+
+    // Asynchronously synchronize with Supabase PostgreSQL database
+    import('../lib/supabase').then(mod => {
+      if (mod.savePhotographerToSupabase) {
+        mod.savePhotographerToSupabase(photographer).catch(e => {
+          console.warn('Background Supabase photographer sync:', e);
+        });
+      }
+    }).catch(() => {});
   } catch (err) {
     console.error('Failed to save photographer to storage:', err);
   }

@@ -158,10 +158,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useApp() {
+const defaultAppContext: AppContextType = {
+  bookings: [],
+  setBookings: () => {},
+  shortlistIds: [],
+  setShortlistIds: () => {},
+  onToggleSave: () => {},
+  selectedCity: 'All India',
+  setSelectedCity: () => {},
+  showLocationPicker: false,
+  setShowLocationPicker: () => {},
+  isBookingModalOpen: false,
+  setIsBookingModalOpen: () => {},
+  bookingConfig: null,
+  setBookingConfig: () => {},
+  openBooking: () => {},
+  openNewBooking: () => {},
+  toastMessage: null,
+  triggerToast: () => {},
+  handleConfirmBooking: () => {},
+  handleLocationSelect: () => {}
+};
+
+export function useApp(): AppContextType {
   const ctx = useContext(AppContext);
-  if (!ctx) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return ctx;
+  return ctx || defaultAppContext;
+}
+
+export function useSafeApp(): AppContextType | null {
+  return useContext(AppContext);
 }

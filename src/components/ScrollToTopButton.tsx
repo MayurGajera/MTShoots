@@ -30,7 +30,7 @@ export const ScrollToTopButton: React.FC = () => {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.8 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 w-12 h-12 pointer-events-auto"
+          className="hidden md:block fixed bottom-6 right-6 z-40 w-12 h-12 pointer-events-auto"
         >
           {/* Tooltip positioned absolutely above - never shifts the button */}
           <AnimatePresence>

@@ -7,6 +7,9 @@ import { Footer } from '../components/Footer';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { saveRegisteredPhotographer } from '../data/photographers';
+import { AvatarPicker } from '../components/AvatarPicker';
+import { savePhotographerToSupabase, upsertUser } from '../lib/supabase';
+import { DEFAULT_CARTOON_AVATAR } from '../data/avatars';
 import { Photographer, Package, PortfolioItem } from '../types';
 import {
   Camera,
@@ -76,35 +79,103 @@ export const PhotographerApplyPage: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [publishedSlug, setPublishedSlug] = useState<string>('');
 
-  // Step 1: Identity & Credentials
+  // Form error tracking
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Step 1: Identity & Credentials (no hardcoded prefill)
   const [fullName, setFullName] = useState('');
   const [brandName, setBrandName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [city, setCity] = useState('Mumbai');
-  const [experienceYears, setExperienceYears] = useState(5);
-  const [startingRate, setStartingRate] = useState(45000);
+  const [city, setCity] = useState('');
+  const [experienceYears, setExperienceYears] = useState<number | ''>('');
+  const [startingRate, setStartingRate] = useState<number | ''>('');
   const [bio, setBio] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState(PRESET_AVATARS[0]);
+  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_CARTOON_AVATAR);
 
-  // Step 2: Disciplines & Equipment
+  // Step 2: Disciplines & Equipment (clean initial state)
   const [primaryGenre, setPrimaryGenre] = useState('Wedding & Pre-Wedding');
-  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([
-    'Destination Weddings',
-    'Bridal Portraits',
-    'Candid Moments'
-  ]);
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [cameraBodies, setCameraBodies] = useState('');
   const [lenses, setLenses] = useState('');
   const [lighting, setLighting] = useState('');
-  const [droneGear, setDroneGear] = useState('DJI Mavic 3 Pro (DGCA Certified Pilot)');
+  const [droneGear, setDroneGear] = useState('');
 
   // Step 3: Packages & Rates
   const [standardTitle, setStandardTitle] = useState('');
-  const [standardRate, setStandardRate] = useState(65000);
-  const [standardHours, setStandardHours] = useState(8);
+  const [standardRate, setStandardRate] = useState<number | ''>('');
+  const [standardHours, setStandardHours] = useState<number | ''>('');
   const [standardDeliverables, setStandardDeliverables] = useState('');
-  const [turnaroundDays, setTurnaroundDays] = useState(4);
+  const [turnaroundDays, setTurnaroundDays] = useState<number | ''>('');
+
+  // Validation functions
+  const validateStep1 = () => {
+    const errs: Record<string, string> = {};
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      errs.fullName = 'Please enter your full legal name (at least 2 characters)';
+    }
+    if (!brandName.trim() || brandName.trim().length < 2) {
+      errs.brandName = 'Please enter your studio / brand name';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      errs.email = 'Please enter a valid email address';
+    }
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!phone.trim() || cleanPhone.length < 10) {
+      errs.phone = 'Please enter a valid 10-digit phone number';
+    }
+    if (!city) {
+      errs.city = 'Please select your base operational city';
+    }
+    if (!startingRate || Number(startingRate) <= 0) {
+      errs.startingRate = 'Please enter your starting rate per shoot';
+    }
+    if (!bio.trim() || bio.trim().length < 20) {
+      errs.bio = 'Please provide a short artist statement (at least 20 characters)';
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const validateStep2 = () => {
+    const errs: Record<string, string> = {};
+    if (selectedSpecialties.length === 0) {
+      errs.specialties = 'Please select at least 1 specialty';
+    }
+    if (!cameraBodies.trim() || cameraBodies.trim().length < 2) {
+      errs.cameraBodies = 'Please specify your primary camera bodies and formats';
+    }
+    if (!lenses.trim() || lenses.trim().length < 2) {
+      errs.lenses = 'Please specify your primary lenses';
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const validateStep3 = () => {
+    const errs: Record<string, string> = {};
+    if (!standardTitle.trim() || standardTitle.trim().length < 2) {
+      errs.standardTitle = 'Please enter a package title (e.g. Full Day Commercial Shoot)';
+    }
+    if (!standardRate || Number(standardRate) <= 0) {
+      errs.standardRate = 'Please enter standard package rate';
+    }
+    if (!standardHours || Number(standardHours) <= 0) {
+      errs.standardHours = 'Please enter shoot duration hours';
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const validateStep4 = () => {
+    const errs: Record<string, string> = {};
+    if (portfolioPhotos.length === 0) {
+      errs.portfolio = 'Please upload at least 1 portfolio photograph to showcase your work';
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   // Step 4: Visual Showcase & Multiple Photos
   const [portfolioPhotos, setPortfolioPhotos] = useState<UploadedPhoto[]>([]);
@@ -180,7 +251,7 @@ export const PhotographerApplyPage: React.FC = () => {
     );
   };
 
-  const handlePublishPhotographer = () => {
+  const handlePublishPhotographer = async () => {
     setIsPublishing(true);
     const slug = (brandName || fullName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'artist-' + Date.now();
     const coverPhoto = portfolioPhotos.find((p) => p.isCover)?.url || portfolioPhotos[0]?.url || avatarUrl;
@@ -277,7 +348,18 @@ export const PhotographerApplyPage: React.FC = () => {
       blackoutDates: [],
     };
 
+    await savePhotographerToSupabase(newPhotographer);
     saveRegisteredPhotographer(newPhotographer);
+    try {
+      const storedUser = localStorage.getItem('mtshoots_user');
+      if (storedUser) {
+        const u = JSON.parse(storedUser);
+        u.photographer_id = slug;
+        u.role = 'photographer';
+        localStorage.setItem('mtshoots_user', JSON.stringify(u));
+        upsertUser({ email: u.email, full_name: brandName || fullName, avatar_url: avatarUrl, city, role: 'photographer'}).catch(() => {});
+      }
+    } catch {}
     setPublishedSlug(slug);
     setIsPublishing(false);
     setShowSuccessModal(true);
@@ -342,50 +424,25 @@ export const PhotographerApplyPage: React.FC = () => {
                 <p className="text-xs text-[#8a726a] mt-1">Introduce yourself and configure your primary business details.</p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#E7E1DA] flex flex-col sm:flex-row items-center gap-6">
-                <div className="relative group shrink-0">
-                  <img
-                    src={avatarUrl}
-                    alt="Profile Avatar"
-                    className="w-20 h-20 rounded-full object-cover ring-4 ring-white shadow-md"
-                  />
-                  <label className="absolute bottom-0 right-0 p-1.5 rounded-full bg-[#C85A32] text-white cursor-pointer hover:bg-[#b04a25] transition-all shadow-xs">
-                    <Upload className="w-3.5 h-3.5" />
-                    <input type="file" accept="image/*" onChange={handleAvatarFile} className="hidden" />
-                  </label>
-                </div>
-                <div className="space-y-2 text-center sm:text-left">
-                  <div className="text-xs font-bold text-[#181615]">Profile Picture / Studio Logo</div>
-                  <p className="text-[11px] text-[#8a726a]">Upload your photo or choose from recommended presets:</p>
-                  <div className="flex items-center gap-2 justify-center sm:justify-start">
-                    {PRESET_AVATARS.map((pUrl, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setAvatarUrl(pUrl)}
-                        className={`w-8 h-8 rounded-full overflow-hidden border-2 transition-all cursor-pointer ${
-                          avatarUrl === pUrl ? 'border-[#C85A32] scale-110' : 'border-transparent opacity-70 hover:opacity-100'
-                        }`}
-                      >
-                        <img src={pUrl} alt={'Preset ' + i} className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <AvatarPicker
+                value={avatarUrl}
+                onChange={setAvatarUrl}
+                label="Profile Picture / Studio Logo"
+                helperText="Upload your custom brand picture or select a creative cartoon avatar"
+              />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Full Legal Name *</label>
-                  <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Mayur Gajera" />
+                  <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Rahul Sharma" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Brand / Studio Name</label>
-                  <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. Mayur Gajera Visuals" />
+                  <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. Lumina Studios" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Email Address *</label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="artist@example.com" />
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. rahul.sharma@example.com" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Mobile Phone (WhatsApp) *</label>
@@ -395,13 +452,15 @@ export const PhotographerApplyPage: React.FC = () => {
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Base Operational City *</label>
                   <select
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-[#E7E1DA] bg-white text-xs font-medium text-[#181615] focus:outline-none focus:border-[#C85A32]"
+                    onChange={(e) => { setCity(e.target.value); if (errors.city) setErrors(prev => ({ ...prev, city: '' })); }}
+                    className={"w-full h-10 px-3 rounded-xl border bg-white text-xs font-medium text-[#181615] focus:outline-none " + (errors.city ? 'border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
                   >
+                    <option value="">Select your base city</option>
                     {INDIAN_CITIES.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
+                  {errors.city && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.city}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Years of Professional Experience</label>
@@ -422,7 +481,7 @@ export const PhotographerApplyPage: React.FC = () => {
 
               <div className="flex justify-end pt-4 border-t border-[#E7E1DA]">
                 <Button
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => { if (validateStep1()) { setErrors({}); setCurrentStep(2); } }}
                   className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2"
                 >
                   <span>Continue to Gear & Disciplines</span>
@@ -489,7 +548,7 @@ export const PhotographerApplyPage: React.FC = () => {
                 <Button variant="outline" onClick={() => setCurrentStep(1)} className="text-xs font-semibold">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back
                 </Button>
-                <Button onClick={() => setCurrentStep(3)} className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2">
+                <Button onClick={() => { if (validateStep2()) { setErrors({}); setCurrentStep(3); } }} className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2">
                   <span>Continue to Packages</span>
                   <ArrowRight className="w-4 h-4" />
                 </Button>
@@ -534,7 +593,7 @@ export const PhotographerApplyPage: React.FC = () => {
                 <Button variant="outline" onClick={() => setCurrentStep(2)} className="text-xs font-semibold">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back
                 </Button>
-                <Button onClick={() => setCurrentStep(4)} className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2">
+                <Button onClick={() => { if (validateStep3()) { setErrors({}); setCurrentStep(4); } }} className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2">
                   <span>Continue to Portfolios</span>
                   <ArrowRight className="w-4 h-4" />
                 </Button>
@@ -669,7 +728,7 @@ export const PhotographerApplyPage: React.FC = () => {
                 <Button variant="outline" onClick={() => setCurrentStep(3)} className="text-xs font-semibold">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back
                 </Button>
-                <Button onClick={() => setCurrentStep(5)} className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2">
+                <Button onClick={() => { if (validateStep4()) { setErrors({}); setCurrentStep(5); } }} className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs px-6 py-2.5 rounded-full flex items-center gap-2">
                   <span>Continue to Review</span>
                   <ArrowRight className="w-4 h-4" />
                 </Button>

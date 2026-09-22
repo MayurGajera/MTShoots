@@ -11,7 +11,8 @@ import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { MTShootsLogo } from '../components/MTShootsLogo';
 import { PhotographerCard } from '../components/PhotographerCard';
-import { INITIAL_PHOTOGRAPHERS } from '../data/photographers';
+import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
+import { loadPhotographers, isSupabaseConfigured } from '../lib/supabase';
 import { fetchCategories, fetchTestimonials } from '@/lib/supabase';
 
 const HERO_IMAGES = [
@@ -208,7 +209,26 @@ export const LandingPage: React.FC = () => {
     }
   };
 
-  const featuredPhotographers = INITIAL_PHOTOGRAPHERS.slice(0, 3);
+  const [allPhotographersList, setAllPhotographersList] = useState<Photographer[]>(() => getAllPhotographers());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setAllPhotographersList(getAllPhotographers());
+    };
+    window.addEventListener('photographers-updated', handleUpdate);
+
+    if (isSupabaseConfigured()) {
+      loadPhotographers().then((remote) => {
+        if (remote && remote.length > 0) {
+          setAllPhotographersList(remote);
+        }
+      }).catch(() => {});
+    }
+
+    return () => window.removeEventListener('photographers-updated', handleUpdate);
+  }, []);
+
+  const featuredPhotographers = allPhotographersList.slice(0, 3);
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col">
@@ -431,7 +451,7 @@ export const LandingPage: React.FC = () => {
             to="/photographers"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#181615] text-white text-xs font-semibold hover:bg-[#C85A32] transition-colors self-start sm:self-auto cursor-pointer"
           >
-            <span>View All Photographers ({INITIAL_PHOTOGRAPHERS.length})</span>
+            <span>View All Photographers ({allPhotographersList.length})</span>
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
