@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 import '@/index.css';
 import { ClientShell } from '@/components/ClientShell';
@@ -16,7 +16,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: 'MTShoots — Discover & Book Top Professional Photographers in India',
+  title: 'MTShoots â€” Discover & Book Top Professional Photographers in India',
   description:
     'MTShoots connects you with verified, award-winning photographers across India. Transparent pricing, real-time availability, instant quotes, and verified portfolios for weddings, fashion, corporate shoots, and more.',
   keywords: [
@@ -28,12 +28,12 @@ export const metadata: Metadata = {
     'MTShoots photography',
   ],
   authors: [{ name: 'MTShoots' }],
-  metadataBase: new URL('http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   openGraph: {
-    title: "MTShoots — India's Premier Photography Network",
+    title: "MTShoots â€” India's Premier Photography Network",
     description:
       "Book India's finest verified photographers with upfront rates and instant booking.",
-    url: 'http://localhost:3000',
+    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     siteName: 'MTShoots',
     images: [
       {
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MTShoots — Book Verified Photographers Across India',
+    title: 'MTShoots â€” Book Verified Photographers Across India',
     description: 'Find verified photographers, compare portfolios, and book effortlessly.',
   },
 };

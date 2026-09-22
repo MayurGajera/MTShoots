@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowUp } from 'lucide-react';
@@ -9,42 +9,34 @@ export const ScrollToTopButton: React.FC = () => {
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 280) {
-        setIsVisible(true);
-      } else {
-        setIsVisible(false);
-      }
+      setIsVisible(window.scrollY > 300);
     };
-
     window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
     <AnimatePresence>
       {isVisible && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+          initial={{ opacity: 0, scale: 0.8, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.8, y: 20 }}
+          exit={{ opacity: 0, scale: 0.8, y: 16 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-40 flex flex-col items-center"
+          className="fixed bottom-[88px] right-4 sm:bottom-[88px] sm:right-5 md:bottom-8 md:right-8 z-30 flex flex-col items-center pointer-events-auto"
         >
-          {/* Tooltip on Hover */}
           <AnimatePresence>
             {isHovered && (
               <motion.span
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: -4 }}
                 exit={{ opacity: 0, y: 6 }}
-                className="mb-2 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-[#181615] rounded-full shadow-lg border border-white/10 whitespace-nowrap pointer-events-none"
+                className="hidden md:inline-block mb-2 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-[#181615] rounded-full shadow-lg border border-white/10 whitespace-nowrap pointer-events-none"
               >
                 Back to Top
               </motion.span>
@@ -57,29 +49,16 @@ export const ScrollToTopButton: React.FC = () => {
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             aria-label="Scroll to top of page"
-            className="group relative w-12 h-14 rounded-full bg-white/95 backdrop-blur-md border-2 border-[#E7E1DA] hover:border-[#C85A32] shadow-xl hover:shadow-[#C85A32]/25 transition-all duration-300 flex flex-col items-center justify-center cursor-pointer hover:scale-105 active:scale-95"
+            className="group relative w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/95 backdrop-blur-md border-2 border-[#E7E1DA] hover:border-[#C85A32] shadow-xl hover:shadow-[#C85A32]/25 transition-all duration-300 flex flex-col items-center justify-center cursor-pointer hover:scale-105 active:scale-95"
           >
-            {/* Ambient pulse effect on hover */}
             <div className="absolute inset-0 rounded-full bg-[#C85A32]/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-
-            {/* Mouse Body Animation */}
-            <div className="relative w-5 h-8 rounded-full border-2 border-[#181615] group-hover:border-[#C85A32] flex items-start justify-center p-1 transition-colors duration-200">
-              {/* Animated Mouse Wheel / Scroll Dot */}
+            <div className="relative w-4 h-5 md:w-5 md:h-7 rounded-full border-2 border-[#181615] group-hover:border-[#C85A32] flex items-start justify-center p-0.5 transition-colors duration-200">
               <motion.div
-                animate={{
-                  y: [0, 8, 0],
-                  opacity: [1, 0.3, 1]
-                }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 1.6,
-                  ease: 'easeInOut'
-                }}
-                className="w-1 h-2 rounded-full bg-[#C85A32] group-hover:bg-[#B24E2A]"
+                animate={{ y: [0, 5, 0], opacity: [1, 0.3, 1] }}
+                transition={{ repeat: Infinity, duration: 1.6, ease: 'easeInOut' }}
+                className="w-1 h-1.5 rounded-full bg-[#C85A32] group-hover:bg-[#B24E2A]"
               />
             </div>
-
-            {/* Subtle mini Arrow pointing up below the mouse */}
             <motion.div
               animate={{ y: [-1, 2, -1] }}
               transition={{ repeat: Infinity, duration: 1.6, ease: 'easeInOut' }}
