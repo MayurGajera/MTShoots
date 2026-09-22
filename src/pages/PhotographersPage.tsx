@@ -1,5 +1,6 @@
+'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from '@/lib/navigation';
 import { Search, ArrowLeft, Calendar as CalendarIcon, X } from 'lucide-react';
 import { Photographer, PortfolioItem } from '../types';
 import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
@@ -28,6 +29,7 @@ export const PhotographersPage: React.FC = () => {
   // Bookings state
   const [bookings, setBookings] = useState<BookingRequest[]>(() => {
     try {
+      if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_bookings');
       return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
     } catch { return INITIAL_BOOKINGS; }
@@ -36,6 +38,7 @@ export const PhotographersPage: React.FC = () => {
   // Shortlist
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     try {
+      if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_shortlist');
       return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
     } catch { return ['darshan-mehta', 'rohan-varma']; }
@@ -437,3 +440,6 @@ export const PhotographersPage: React.FC = () => {
     </div>
   );
 };
+
+
+export default PhotographersPage;

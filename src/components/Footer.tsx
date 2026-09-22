@@ -1,6 +1,7 @@
+'use client';
 import React from 'react';
 import { Camera, Instagram, Twitter, Linkedin, Mail, MapPin, Phone } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/navigation';
 import { MTShootsLogo } from './MTShootsLogo';
 
 export const Footer: React.FC = () => {

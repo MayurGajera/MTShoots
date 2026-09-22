@@ -1,3 +1,4 @@
+'use client';
 import React from 'react';
 import { PHOTOGRAPHY_CATEGORIES, PhotographyCategory } from '../data/categories';
 import { Sparkles } from 'lucide-react';

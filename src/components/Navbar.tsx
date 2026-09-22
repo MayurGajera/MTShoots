@@ -1,3 +1,4 @@
+'use client';
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
@@ -17,7 +18,7 @@ import {
   Check,
   ShieldCheck
 } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from '@/lib/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -83,6 +84,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   // User state
   const [user, setUser] = useState<UserProfile | null>(() => {
     try {
+      if (typeof window === 'undefined') return null;
       const stored = localStorage.getItem('mtshoots_user');
       return stored ? JSON.parse(stored) : null;
     } catch {
@@ -92,6 +94,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const [currentCity, setCurrentCity] = useState<string>(() => {
     try {
+      if (typeof window === 'undefined') return 'All India';
       return localStorage.getItem('mtshoots_city') || 'All India';
     } catch {
       return 'All India';
@@ -102,7 +105,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   useEffect(() => {
     const handleStorage = () => {
       try {
-        const stored = localStorage.getItem('mtshoots_user');
+        if (typeof window === 'undefined') return null;
+      const stored = localStorage.getItem('mtshoots_user');
         setUser(stored ? JSON.parse(stored) : null);
         const city = localStorage.getItem('mtshoots_city');
         if (city) setCurrentCity(city);

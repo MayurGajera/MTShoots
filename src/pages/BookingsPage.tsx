@@ -1,9 +1,11 @@
+'use client';
 import React, { useState } from 'react';
 import {
   Calendar, Clock, MapPin, CheckCircle2, Camera, AlertCircle,
   XCircle, User, FileText, ChevronDown, ChevronUp, Plus, ArrowLeft
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/navigation';
+import { useApp } from '@/context/AppContext';
 import { BookingRequest, Photographer } from '../types';
 import { formatINR } from '../utils/format';
 import { Navbar } from '../components/Navbar';
@@ -32,6 +34,7 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
   const [bookings] = useState<BookingRequest[]>(() => {
     if (propBookings) return propBookings;
     try {
+      if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_bookings');
       return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
     } catch { return INITIAL_BOOKINGS; }
@@ -266,3 +269,6 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
     </div>
   );
 };
+
+
+export default BookingsPage;

@@ -1,5 +1,6 @@
+'use client';
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/navigation';
 import { Clock, RefreshCw, AlertTriangle, ArrowLeft, CheckCircle2, ShieldCheck, Calendar } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
@@ -127,3 +128,6 @@ export const CancellationPage: React.FC = () => {
     </div>
   );
 };
+
+
+export default CancellationPage;

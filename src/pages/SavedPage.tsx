@@ -1,6 +1,7 @@
+'use client';
 import React, { useState } from 'react';
 import { Heart, Camera, ArrowLeft, X } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '@/lib/navigation';
 import { Photographer } from '../types';
 import { INITIAL_PHOTOGRAPHERS } from '../data/photographers';
 import { PhotographerCard } from '../components/PhotographerCard';
@@ -18,6 +19,7 @@ export const SavedPage: React.FC = () => {
 
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     try {
+      if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_shortlist');
       return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
     } catch { return ['darshan-mehta', 'rohan-varma']; }
@@ -25,6 +27,7 @@ export const SavedPage: React.FC = () => {
 
   const [bookings, setBookings] = useState<BookingRequest[]>(() => {
     try {
+      if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_bookings');
       return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
     } catch { return INITIAL_BOOKINGS; }
@@ -188,3 +191,6 @@ export const SavedPage: React.FC = () => {
     </div>
   );
 };
+
+
+export default SavedPage;
