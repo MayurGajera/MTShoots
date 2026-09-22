@@ -25,7 +25,6 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { MTShootsLogo } from './MTShootsLogo';
 import { AvatarPicker } from './AvatarPicker';
-import { DEFAULT_CARTOON_AVATAR } from '../data/avatars';
 import { getUserByEmail, upsertUser, getUserAddresses, addUserAddress, deleteUserAddress, getUserDevices, deactivateDevice, DbUserAddress, DbUserDevice } from '@/lib/supabase';
 
 interface NavbarProps {
@@ -46,13 +45,6 @@ interface UserProfile {
   city?: string;
   phone?: string;
 }
-
-const PRESET_USER_AVATARS = [ DEFAULT_CARTOON_AVATAR, 
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80'
-];
 
 export const Navbar: React.FC<NavbarProps> = ({
   bookingCount = 0,
@@ -178,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       setSettingsName(user.fullName || '');
       setSettingsPhone(user.phone || '');
       setSettingsCity(user.city || currentCity);
-      setSettingsAvatar(user.avatar || PRESET_USER_AVATARS[0]);
+      setSettingsAvatar(user.avatar || '');
       if (user.email) {
         loadUserAccountData(user.email);
       }
@@ -253,7 +245,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       fullName: trimmedName,
       phone: settingsPhone.trim(),
       city: settingsCity.trim() || currentCity,
-      avatar: settingsAvatar || DEFAULT_CARTOON_AVATAR
+      avatar: settingsAvatar || ''
     };
     setUser(updated);
     localStorage.setItem('mtshoots_user', JSON.stringify(updated));
@@ -265,7 +257,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         full_name: trimmedName,
         phone: settingsPhone.trim(),
         city: settingsCity.trim() || currentCity,
-        avatar_url: settingsAvatar || DEFAULT_CARTOON_AVATAR,
+        avatar_url: settingsAvatar || '',
         role: user.role || 'customer'
       });
     } catch (err) {
@@ -340,7 +332,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         : 'text-[#57423b] hover:text-[#181615] hover:bg-[#F4EFEB]'
     }`;
 
-  const userAvatarImage = user?.avatar || PRESET_USER_AVATARS[0];
+  const hasUserAvatar = Boolean(user?.avatar && user.avatar.trim());
 
   return (
     <header className="sticky top-0 z-40 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#E7E1DA] transition-all">
@@ -421,11 +413,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full border border-[#E7E1DA] hover:border-[#C85A32]/50 bg-white hover:bg-[#FAF8F5] transition-all cursor-pointer shadow-xs"
                 >
                   <div className="relative">
-                    <img
-                      src={userAvatarImage}
-                      alt={user.fullName}
-                      className="w-7 h-7 rounded-full object-cover ring-2 ring-[#C85A32]/30"
-                    />
+                    {hasUserAvatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.fullName}
+                        className="w-7 h-7 rounded-full object-cover ring-2 ring-[#C85A32]/30"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-[#FAF8F5] border border-[#E7E1DA] flex items-center justify-center text-[#C85A32] ring-2 ring-[#C85A32]/20">
+                        <User className="w-3.5 h-3.5" />
+                      </div>
+                    )}
                     <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-[#2D593E] ring-1 ring-white" />
                   </div>
                   <span className="text-xs font-bold text-[#181615] truncate max-w-[90px]">
@@ -447,11 +445,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                       {/* User Header */}
                       <div className="p-3 bg-[#FAF8F5] rounded-xl mb-1 border border-[#E7E1DA]/60">
                         <div className="flex items-center gap-2.5">
-                          <img
-                            src={userAvatarImage}
-                            alt={user.fullName}
-                            className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-xs"
-                          />
+                          {hasUserAvatar ? (
+                            <img
+                              src={user.avatar}
+                              alt={user.fullName}
+                              className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-xs"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-white border border-[#E7E1DA] flex items-center justify-center text-[#C85A32] shadow-xs">
+                              <User className="w-5 h-5" />
+                            </div>
+                          )}
                           <div className="truncate">
                             <div className="text-xs font-bold text-[#181615] truncate">{user.fullName}</div>
                             <div className="text-[11px] text-[#8a726a] truncate">{user.email}</div>
@@ -545,7 +549,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               {user && (
                 <div className="p-3 bg-[#FAF8F5] rounded-xl mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <img src={userAvatarImage} alt={user.fullName} className="w-8 h-8 rounded-full object-cover" />
+                    {hasUserAvatar ? (
+                      <img src={user.avatar} alt={user.fullName} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-white border border-[#E7E1DA] flex items-center justify-center text-[#C85A32]">
+                        <User className="w-4 h-4" />
+                      </div>
+                    )}
                     <div>
                       <div className="text-xs font-bold text-[#181615]">{user.fullName}</div>
                       <div className="text-[10px] text-[#8a726a]">{user.email}</div>
@@ -681,8 +691,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <AvatarPicker
                   value={settingsAvatar}
                   onChange={setSettingsAvatar}
-                  label='Profile Photo or Cartoon Avatar'
-                  helperText='Upload your custom photo or choose a cartoon avatar'
+                  label='Profile Photo (Optional)'
+                  helperText='Upload your custom photo or leave empty for default profile icon'
                 />
 
                 <div>

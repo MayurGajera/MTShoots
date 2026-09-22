@@ -9,7 +9,6 @@ import { Input } from '../components/ui/input';
 import { saveRegisteredPhotographer } from '../data/photographers';
 import { AvatarPicker } from '../components/AvatarPicker';
 import { savePhotographerToSupabase, upsertUser } from '../lib/supabase';
-import { DEFAULT_CARTOON_AVATAR } from '../data/avatars';
 import { Photographer, Package, PortfolioItem } from '../types';
 import {
   Camera,
@@ -91,7 +90,7 @@ export const PhotographerApplyPage: React.FC = () => {
   const [experienceYears, setExperienceYears] = useState<number | ''>('');
   const [startingRate, setStartingRate] = useState<number | ''>('');
   const [bio, setBio] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_CARTOON_AVATAR);
+  const [avatarUrl, setAvatarUrl] = useState('');
 
   // Step 2: Disciplines & Equipment (clean initial state)
   const [primaryGenre, setPrimaryGenre] = useState('Wedding & Pre-Wedding');
@@ -428,7 +427,8 @@ export const PhotographerApplyPage: React.FC = () => {
                 value={avatarUrl}
                 onChange={setAvatarUrl}
                 label="Profile Picture / Studio Logo"
-                helperText="Upload your custom brand picture or select a creative cartoon avatar"
+                helperText="Upload your custom brand picture or headshot (optional)"
+                optional={true}
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

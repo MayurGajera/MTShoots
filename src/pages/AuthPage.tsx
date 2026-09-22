@@ -22,7 +22,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MTShootsLogo } from '../components/MTShootsLogo';
 import { ButtonSpinner } from '../components/ApertureLoader';
 import { AvatarPicker } from '../components/AvatarPicker';
-import { DEFAULT_CARTOON_AVATAR } from '../data/avatars';
 import { upsertUser, getUserByEmail } from '../lib/supabase';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
@@ -47,7 +46,7 @@ export const AuthPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [city, setCity] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_CARTOON_AVATAR);
+  const [avatarUrl, setAvatarUrl] = useState('');
 
   // Forgot Password / OTP Flow States
   const [otpStage, setOtpStage] = useState<'email' | 'otp' | 'newPassword' | 'done'>('email');
@@ -139,7 +138,7 @@ export const AuthPage: React.FC = () => {
     try {
       let finalName = fullName.trim();
       let finalCity = city.trim() || 'Mumbai';
-      let finalAvatar = avatarUrl;
+      let finalAvatar = avatarUrl || '';
       let finalRole = role;
       let userId = 'usr-' + Date.now();
 
@@ -281,10 +280,10 @@ export const AuthPage: React.FC = () => {
       </div>
 
       {/* Main Container */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="max-w-md w-full">
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <div className="w-full max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl transition-all">
           {/* Card */}
-          <div className="bg-white rounded-3xl border border-[#E7E1DA] p-6 sm:p-8 shadow-sm">
+          <div className="bg-white rounded-3xl border border-[#E7E1DA] p-6 sm:p-10 lg:p-12 shadow-sm">
             {/* If in Forgot Password Mode */}
             {mode === 'forgot' ? (
               <div>
@@ -548,43 +547,46 @@ export const AuthPage: React.FC = () => {
                       <AvatarPicker
                         value={avatarUrl}
                         onChange={setAvatarUrl}
-                        label={role === 'photographer' ? 'Artist Profile Picture / Cartoon' : 'Profile Photo / Cartoon Avatar'}
-                        helperText='Upload custom picture or choose a cartoon avatar'
+                        label={role === 'photographer' ? 'Artist Profile Picture' : 'Profile Photo'}
+                        helperText='Upload your photo or leave blank for default avatar'
+                        optional={true}
                       />
 
-                      <div>
-                        <label className='block text-xs font-bold text-[#181615] mb-1.5'>
-                          Full Name *
-                        </label>
-                        <input
-                          type='text'
-                          value={fullName}
-                          onChange={(e) => {
-                            setFullName(e.target.value);
-                            if (validationErrors.fullName) setValidationErrors(prev => ({ ...prev, fullName: '' }));
-                          }}
-                          placeholder='e.g. Rahul Sharma'
-                          className={'w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs placeholder:text-stone-400 placeholder:font-normal focus:outline-none transition-colors ' + (validationErrors.fullName ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
-                        />
-                        {validationErrors.fullName && (
-                          <p className='text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1'>
-                            <AlertCircle className='w-3 h-3 shrink-0' />
-                            <span>{validationErrors.fullName}</span>
-                          </p>
-                        )}
-                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className='block text-xs font-bold text-[#181615] mb-1.5'>
+                            Full Name *
+                          </label>
+                          <input
+                            type='text'
+                            value={fullName}
+                            onChange={(e) => {
+                              setFullName(e.target.value);
+                              if (validationErrors.fullName) setValidationErrors(prev => ({ ...prev, fullName: '' }));
+                            }}
+                            placeholder='e.g. Rahul Sharma'
+                            className={'w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs placeholder:text-stone-400 placeholder:font-normal focus:outline-none transition-colors ' + (validationErrors.fullName ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
+                          />
+                          {validationErrors.fullName && (
+                            <p className='text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1'>
+                              <AlertCircle className='w-3 h-3 shrink-0' />
+                              <span>{validationErrors.fullName}</span>
+                            </p>
+                          )}
+                        </div>
 
-                      <div>
-                        <label className='block text-xs font-bold text-[#181615] mb-1.5'>
-                          City
-                        </label>
-                        <input
-                          type='text'
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
-                          placeholder='e.g. Mumbai, Delhi, Bengaluru'
-                          className='w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-[#C85A32]'
-                        />
+                        <div>
+                          <label className='block text-xs font-bold text-[#181615] mb-1.5'>
+                            City
+                          </label>
+                          <input
+                            type='text'
+                            value={city}
+                            onChange={(e) => setCity(e.target.value)}
+                            placeholder='e.g. Mumbai, Delhi, Bengaluru'
+                            className='w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-[#C85A32]'
+                          />
+                        </div>
                       </div>
                     </>
                   )}
