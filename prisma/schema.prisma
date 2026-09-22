@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Photographer {
+  id                String    @id
+  name              String
+  location          String
+  baseCity          String    @map("base_city")
+  officeLocation    String?   @map("office_location")
+  officeAddress     String?   @map("office_address")
+  officeMapUrl      String?   @map("office_map_url")
+  avatar            String
+  heroImage         String    @map("hero_image")
+  primaryCategory   String    @map("primary_category")
+  specialties       String[]
+  experienceLevel   String    @map("experience_level")
+  experienceYears   Int       @map("experience_years")
+  rating            Float     @default(4.95)
+  reviewCount       Int       @default(0) @map("review_count")
+  dayRate           Int       @map("day_rate")
+  halfDayRate       Int       @map("half_day_rate")
+  availableNow      Boolean   @default(true) @map("available_now")
+  nextAvailableDate String?   @map("next_available_date")
+  clientRoster      String[]  @map("client_roster")
+  bio               String    @db.Text
+  awards            String[]
+  equipment         String[]
+  cameraFormat      String    @map("camera_format")
+  homeSliderPhotos  String[]  @map("home_slider_photos")
+  turnaroundDays    Int       @default(3) @map("turnaround_days")
+  assistantIncluded Boolean   @default(true) @map("assistant_included")
+  portfolio         Json      @default("[]")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  bookings          Booking[]
+
+  @@map("photographers")
+}
+
+model Booking {
+  id                 String        @id
+  photographerId     String?       @map("photographer_id")
+  photographerName   String        @map("photographer_name")
+  photographerAvatar String        @map("photographer_avatar")
+  campaignTitle      String        @map("campaign_title")
+  clientBrand        String        @map("client_brand")
+  artDirectorName    String        @map("art_director_name")
+  artDirectorEmail   String        @map("art_director_email")
+  shootDate          String        @map("shoot_date")
+  callTime           String        @map("call_time")
+  locationName       String        @map("location_name")
+  locationAddress    String        @map("location_address")
+  durationType       String        @map("duration_type")
+  usageRights        String        @map("usage_rights")
+  selectedAddOns     String[]      @map("selected_add_ons")
+  dayRate            Int           @map("day_rate")
+  durationCost       Int           @map("duration_cost")
+  usageCost          Int           @map("usage_cost")
+  addOnsCost         Int           @map("add_ons_cost")
+  productionFee      Int           @map("production_fee")
+  totalCost          Int           @map("total_cost")
+  status             String        @default("confirmed")
+  notes              String?       @db.Text
+  shotListOverview   String?       @db.Text @map("shot_list_overview")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  photographer       Photographer? @relation(fields: [photographerId], references: [id], onDelete: SetNull)
+
+  @@map("bookings")
+}
+
+model Shortlist {
+  id             String   @id @default(uuid())
+  photographerId String   @map("photographer_id")
+  sessionId      String   @default("default_session") @map("session_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([photographerId, sessionId])
+  @@map("shortlists")
+}
