@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft } from 'lucide-react';
+import { Search, ArrowLeft, Calendar as CalendarIcon, X } from 'lucide-react';
 import { Photographer, PortfolioItem } from '../types';
-import { INITIAL_PHOTOGRAPHERS } from '../data/photographers';
+import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
 import { isSupabaseConfigured, loadPhotographers } from '../lib/supabase';
 import { FilterBar, BudgetRangeType, ExperienceLevelFilterType, SortOptionType } from '../components/FilterBar';
 import { CategoryFlowBar } from '../components/CategoryFlowBar';
@@ -21,9 +21,9 @@ export const PhotographersPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // Photographers data
-  const [photographers, setPhotographers] = useState<Photographer[]>(INITIAL_PHOTOGRAPHERS);
-  const [isLoading, setIsLoading] = useState(true);
+  // Photographers data — load initial plus dynamically registered photographers
+  const [photographers, setPhotographers] = useState<Photographer[]>(() => getAllPhotographers());
+  const [isLoading, setIsLoading] = useState(false);
 
   // Bookings state
   const [bookings, setBookings] = useState<BookingRequest[]>(() => {
@@ -77,6 +77,7 @@ export const PhotographersPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
   const [selectedExperience, setSelectedExperience] = useState<ExperienceLevelFilterType>('all');
   const [selectedCity, setSelectedCity] = useState(searchParams.get('city') || 'All');
+  const [targetDate, setTargetDate] = useState<string>(searchParams.get('date') || '');
   const [budgetRange, setBudgetRange] = useState<BudgetRangeType>('all');
   const [onlyAvailableNow, setOnlyAvailableNow] = useState(false);
   const [onlyTopRated, setOnlyTopRated] = useState(false);
@@ -90,28 +91,39 @@ export const PhotographersPage: React.FC = () => {
     setSelectedCategory(cat || 'all');
     const city = searchParams.get('city');
     if (city) setSelectedCity(city);
+    const dateParam = searchParams.get('date');
+    if (dateParam) setTargetDate(dateParam);
     const search = searchParams.get('search');
     if (search !== null) setSearchQuery(search);
   }, [searchParams]);
+
+  // Keep synced with registered photographers storage events
+  useEffect(() => {
+    const handleUpdate = () => {
+      setPhotographers(getAllPhotographers());
+    };
+    window.addEventListener('photographers-updated', handleUpdate);
+    return () => window.removeEventListener('photographers-updated', handleUpdate);
+  }, []);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Load photographers
+  // Load photographers from Supabase if configured
   useEffect(() => {
     async function load() {
-      setIsLoading(true);
       if (isSupabaseConfigured()) {
         try {
           const remote = await loadPhotographers();
-          if (remote && remote.length > 0) setPhotographers(remote);
+          if (remote && remote.length > 0) {
+            setPhotographers([...getAllPhotographers().filter(p => !remote.some(r => r.id === p.id)), ...remote]);
+          }
         } catch {
-          // Fallback to initial data already set
+          // Fallback to local
         }
       }
-      setIsLoading(false);
     }
     load();
   }, []);
@@ -131,15 +143,17 @@ export const PhotographersPage: React.FC = () => {
     setSelectedCategory('all');
     setSelectedExperience('all');
     setSelectedCity('All');
+    setTargetDate('');
     setBudgetRange('all');
     setOnlyAvailableNow(false);
     setOnlyTopRated(false);
     setOnlyFastDelivery(false);
     setOnlyAssistantIncluded(false);
     setSortBy('featured');
+    navigate('/photographers', { replace: true });
   };
 
-  const cities = useMemo(() => Array.from(new Set(photographers.map(p => p.baseCity))).sort(), [photographers]);
+  const cities = useMemo(() => Array.from(new Set(photographers.map(p => p.baseCity).filter(Boolean))).sort(), [photographers]);
 
   const photographerCountsByCategory = useMemo(() => {
     const counts: Record<string, number> = {
@@ -169,12 +183,15 @@ export const PhotographersPage: React.FC = () => {
         if (!isPhotographerInCategory(p, selectedCategory)) return false;
       }
       if (selectedExperience !== 'all' && p.experienceLevel !== selectedExperience) return false;
-      if (selectedCity !== 'All') {
+      if (selectedCity && selectedCity !== 'All' && selectedCity !== 'All Cities' && selectedCity.trim() !== '') {
         const cityLower = selectedCity.toLowerCase();
         const matchesBase = p.baseCity && p.baseCity.toLowerCase().includes(cityLower);
         const matchesLoc = p.location && p.location.toLowerCase().includes(cityLower);
         const cityInLoc = cityLower.includes((p.baseCity || '').toLowerCase());
         if (!matchesBase && !matchesLoc && !cityInLoc) return false;
+      }
+      if (targetDate && p.blackoutDates && p.blackoutDates.includes(targetDate)) {
+        return false;
       }
       if (budgetRange === 'under-50k' && p.dayRate >= 50000) return false;
       if (budgetRange === '50k-100k' && (p.dayRate < 50000 || p.dayRate > 100000)) return false;
@@ -193,26 +210,26 @@ export const PhotographersPage: React.FC = () => {
       if (sortBy === 'turnaround') return a.turnaroundDays - b.turnaroundDays;
       return 0;
     });
-  }, [photographers, searchQuery, selectedCategory, selectedExperience, selectedCity, budgetRange, onlyAvailableNow, onlyTopRated, onlyFastDelivery, onlyAssistantIncluded, sortBy]);
+  }, [photographers, searchQuery, selectedCategory, selectedExperience, selectedCity, targetDate, budgetRange, onlyAvailableNow, onlyTopRated, onlyFastDelivery, onlyAssistantIncluded, sortBy]);
 
   const handleToggleShortlist = (id: string) => {
     if (shortlistIds.includes(id)) {
       setShortlistIds(shortlistIds.filter(x => x !== id));
-      triggerToast('Photographer removed from saved.');
+      triggerToast('Removed from shortlist');
     } else {
       setShortlistIds([...shortlistIds, id]);
-      triggerToast('Photographer saved!');
+      triggerToast('Added to shortlist');
     }
   };
 
   const handleQuickBook = (p: Photographer) => {
     setBookingConfig({
       photographer: p,
-      selectedDate: p.nextAvailableDate,
+      selectedDate: targetDate || p.nextAvailableDate,
       durationType: 'full-day',
       usageRights: 'commercial-standard',
-      selectedAddOns: ['medium-format'],
-      totalCost: p.dayRate + Math.round(p.dayRate * 0.45) + 18000 + 5000,
+      selectedAddOns: [],
+      totalCost: p.dayRate + 5000,
       shootLocation: p.officeLocation || p.location
     });
     setIsBookingModalOpen(true);
@@ -228,7 +245,7 @@ export const PhotographersPage: React.FC = () => {
     setBookings([newBooking, ...bookings]);
     setIsBookingModalOpen(false);
     setBookingConfig(null);
-    triggerToast(`Booking confirmed! Check your bookings.`);
+    triggerToast('Booking confirmed! Check your bookings.');
   };
 
   const allPortfolioItems = useMemo(() => photographers.flatMap(p => p.portfolio), [photographers]);
@@ -244,7 +261,6 @@ export const PhotographersPage: React.FC = () => {
       />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
-        {/* Page Header */}
         <div className="relative py-6 sm:py-8 border-b border-[#E7E1DA] mb-6 page-enter">
           <div className="flex items-center gap-3 mb-3">
             <Link to="/" className="flex items-center gap-1 text-xs text-[#8a726a] hover:text-[#C85A32] transition-colors cursor-pointer">
@@ -253,7 +269,7 @@ export const PhotographersPage: React.FC = () => {
           </div>
           <div className="max-w-3xl space-y-3">
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-[#fbf2ee] border border-[#dec0b7] text-[11px] font-bold tracking-widest uppercase text-[#9f3c16]">
-              <span>✦</span>
+              <span>📸</span>
               <span>MTShoots • Verified Professional Photographers</span>
             </div>
             <h1 className="font-serif text-3xl sm:text-5xl font-bold tracking-tight text-[#181615] leading-[1.15]">
@@ -278,7 +294,6 @@ export const PhotographersPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Category Bar */}
         <CategoryFlowBar
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
@@ -286,7 +301,32 @@ export const PhotographersPage: React.FC = () => {
           totalPhotographersCount={photographers.length}
         />
 
-        {/* Filter Bar */}
+        {targetDate && (
+          <div className="mb-4 flex items-center justify-between p-3.5 rounded-2xl bg-[#FFF6F2] border border-[#F4C5B5] text-[#9F3C16] text-xs shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-white shadow-2xs">
+                <CalendarIcon className="w-4 h-4 text-[#C85A32]" />
+              </span>
+              <span>
+                Filtering available photographers for shoot date: <strong className="font-bold text-[#181615]">{targetDate}</strong>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setTargetDate('');
+                const newParams = new URLSearchParams(searchParams);
+                newParams.delete('date');
+                navigate('/photographers?' + newParams.toString(), { replace: true });
+              }}
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white hover:bg-[#FAF8F5] border border-[#E7E1DA] text-xs font-bold text-[#C85A32] shadow-2xs transition-all cursor-pointer"
+            >
+              <span>Clear Date</span>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         <FilterBar
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
@@ -314,82 +354,84 @@ export const PhotographersPage: React.FC = () => {
           onResetFilters={handleResetFilters}
         />
 
-        {/* Photographers Grid */}
         {isLoading ? (
-          <ShimmerCardGrid count={9} />
-        ) : filteredPhotographers.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 pb-12">
-            {filteredPhotographers.map(p => (
-              <PhotographerCard
-                key={p.id}
-                photographer={p}
-                onSelect={(artist) => navigate(`/photographers/${artist.id}`)}
-                onQuickBook={handleQuickBook}
-                isSaved={shortlistIds.includes(p.id)}
-                onToggleSave={handleToggleShortlist}
-              />
-            ))}
+          <div className="mt-8">
+            <ShimmerCardGrid count={6} />
           </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-[#E7E1DA] p-12 text-center max-w-md mx-auto my-12 shadow-sm animate-scaleIn">
-            <Search className="w-10 h-10 text-[#8a726a] mx-auto mb-3" />
-            <h3 className="font-serif text-xl font-bold text-[#181615] mb-1">No Photographers Found</h3>
-            <p className="text-xs text-[#57423b] mb-4">
-              Try adjusting your filters or search to explore the full roster.
+        ) : filteredPhotographers.length === 0 ? (
+          <div className="text-center py-16 px-4 bg-white rounded-3xl border border-[#E7E1DA] mt-6 shadow-xs">
+            <div className="w-16 h-16 rounded-full bg-[#fbf2ee] text-[#C85A32] flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8" />
+            </div>
+            <h3 className="font-serif text-xl font-bold text-[#181615] mb-2">No Photographers Found</h3>
+            <p className="text-sm text-[#8a726a] max-w-md mx-auto mb-6">
+              We could not find any photographers matching your exact filter criteria. Try expanding your search or clearing date/city filters.
             </p>
             <button
               onClick={handleResetFilters}
-              className="px-5 py-2.5 rounded-full bg-[#C85A32] text-white text-xs font-semibold hover:bg-[#B24E2A] cursor-pointer transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs transition-colors cursor-pointer shadow-sm"
             >
               Reset All Filters
             </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            {filteredPhotographers.map((photographer) => (
+              <PhotographerCard
+                key={photographer.id}
+                photographer={photographer}
+                onSelect={() => setSelectedPhotographer(photographer)}
+                onQuickBook={() => handleQuickBook(photographer)}
+                isSaved={shortlistIds.includes(photographer.id)}
+                onToggleSave={() => handleToggleShortlist(photographer.id)}
+                targetDate={targetDate}
+              />
+            ))}
           </div>
         )}
       </main>
 
       <Footer />
 
-      {/* Photographer Detail Modal */}
       {selectedPhotographer && (
         <PhotographerDetailModal
           photographer={selectedPhotographer}
+          isOpen={true}
           onClose={() => setSelectedPhotographer(null)}
           onStartBooking={handleStartBookingFromDetail}
           isSaved={shortlistIds.includes(selectedPhotographer.id)}
-          onToggleSave={handleToggleShortlist}
-          onOpenLightbox={item => setLightboxItem(item)}
+          onToggleSave={() => handleToggleShortlist(selectedPhotographer.id)}
         />
       )}
 
-      {/* Media Lightbox */}
-      {lightboxItem && (
-        <MediaLightbox
-          item={lightboxItem}
-          allItems={allPortfolioItems}
-          onClose={() => setLightboxItem(null)}
-          onNavigate={item => setLightboxItem(item)}
-          onBookSimilar={() => {
-            const artist = photographers.find(p => p.portfolio.some(i => i.id === lightboxItem.id));
-            if (artist) handleQuickBook(artist);
-          }}
-        />
-      )}
-
-      {/* Booking Modal */}
       {isBookingModalOpen && (
         <BookingSheetModal
-          initialConfig={bookingConfig}
-          photographers={photographers}
+          isOpen={true}
           onClose={() => { setIsBookingModalOpen(false); setBookingConfig(null); }}
+          photographer={bookingConfig?.photographer}
+          photographers={photographers}
+          initialDate={bookingConfig?.selectedDate || targetDate}
+          initialDuration={bookingConfig?.durationType}
+          initialUsageRights={bookingConfig?.usageRights}
+          initialLocation={bookingConfig?.shootLocation}
           onConfirmBooking={handleConfirmBooking}
         />
       )}
 
-      {/* Toast */}
+      {lightboxItem && (
+        <MediaLightbox
+          item={lightboxItem}
+          items={allPortfolioItems}
+          isOpen={true}
+          onClose={() => setLightboxItem(null)}
+          onSelect={(item) => setLightboxItem(item)}
+        />
+      )}
+
       {toastMessage && (
-        <div className="fixed top-24 right-4 z-50 bg-[#181615] text-white px-4 py-3 rounded-xl shadow-2xl border border-[#dec0b7]/30 flex items-center space-x-2.5 animate-bounce-short">
-          <span className="w-2 h-2 rounded-full bg-[#4A7C59]" />
-          <span className="text-xs font-medium">{toastMessage}</span>
+        <div className="fixed bottom-6 right-6 z-50 bg-[#181615] text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl border border-white/10 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <span>✓</span>
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>
