@@ -1,3 +1,4 @@
+'use client';
 import React, { useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, Camera, MapPin, Calendar, Sparkles } from 'lucide-react';
 import { PortfolioItem } from '../types';

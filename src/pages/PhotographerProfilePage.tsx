@@ -1,5 +1,7 @@
+'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate } from '@/lib/navigation';
+import { useApp } from '@/context/AppContext';
 import {
   Camera, Star, MapPin, Calendar, Clock, Award, ShieldCheck,
   Heart, Share2, ArrowLeft, ChevronLeft, ChevronRight, Check,
@@ -742,3 +744,6 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
     </div>
   );
 };
+
+
+export default PhotographerProfilePage;

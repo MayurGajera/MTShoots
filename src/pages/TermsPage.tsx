@@ -1,5 +1,6 @@
+'use client';
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/navigation';
 import { ShieldCheck, FileText, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
@@ -89,3 +90,6 @@ export const TermsPage: React.FC = () => {
     </div>
   );
 };
+
+
+export default TermsPage;

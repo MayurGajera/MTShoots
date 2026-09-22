@@ -1,3 +1,4 @@
+'use client';
 import React from 'react';
 import { Bookmark, Trash2, ArrowRight, Heart, Star, MapPin } from 'lucide-react';
 import { Photographer } from '../types';

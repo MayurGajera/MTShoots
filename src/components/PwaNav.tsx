@@ -1,6 +1,7 @@
+'use client';
 import React from 'react';
 import { Camera, Calendar, Heart, PlusCircle, Home } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from '@/lib/navigation';
 
 interface PwaNavProps {
   currentTab?: 'roster' | 'callsheets' | 'shortlist';

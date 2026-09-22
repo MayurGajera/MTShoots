@@ -1,5 +1,6 @@
+'use client';
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/navigation';
 import { Shield, Lock, Eye, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
@@ -81,3 +82,6 @@ export const PrivacyPage: React.FC = () => {
     </div>
   );
 };
+
+
+export default PrivacyPage;

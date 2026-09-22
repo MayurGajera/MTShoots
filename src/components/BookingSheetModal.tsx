@@ -1,3 +1,4 @@
+'use client';
 import React, { useMemo, useState } from 'react';
 import { X, Calendar, MapPin, Clock, User, Mail, FileText, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Photographer, BookingRequest, ShootDurationType, UsageRightsTier } from '../types';

@@ -1,6 +1,7 @@
+'use client';
 import React, { useState, useCallback, useRef } from 'react';
 import { Star, MapPin, Heart, ArrowRight, ShieldCheck, Clock, Sparkles, Award, Camera, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '@/lib/navigation';
 import { motion } from 'motion/react';
 import { Photographer } from '../types';
 import { formatINR } from '../utils/format';

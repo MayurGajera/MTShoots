@@ -1,3 +1,4 @@
+'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Search, Locate, X, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';

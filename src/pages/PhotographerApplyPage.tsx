@@ -1,5 +1,6 @@
+'use client';
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '@/lib/navigation';
 import { motion } from 'motion/react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
@@ -761,3 +762,6 @@ export const PhotographerApplyPage: React.FC = () => {
     </div>
   );
 };
+
+
+export default PhotographerApplyPage;

@@ -1,5 +1,6 @@
+'use client';
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '@/lib/navigation';
 import {
   Camera, Star, Shield, Clock, ChevronRight, Play, Search,
   CheckCircle2, Users, Image, Calendar as CalendarIcon, Sparkles, ArrowRight,
@@ -74,6 +75,7 @@ export const LandingPage: React.FC = () => {
   const [searchCategory, setSearchCategory] = useState('All');
   const [searchCity, setSearchCity] = useState(() => {
     try {
+      if (typeof window === 'undefined') return '';
       return localStorage.getItem('mtshoots_city') || '';
     } catch {
       return '';
@@ -88,6 +90,7 @@ export const LandingPage: React.FC = () => {
   // Shortlist state for featured cards
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     try {
+      if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_shortlist');
       return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
     } catch {
@@ -515,3 +518,6 @@ export const LandingPage: React.FC = () => {
     </div>
   );
 };
+
+
+export default LandingPage;

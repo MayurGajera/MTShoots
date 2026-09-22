@@ -1,5 +1,6 @@
+'use client';
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from '@/lib/navigation';
 import {
   Camera,
   User,
@@ -652,3 +653,5 @@ export const AuthPage: React.FC = () => {
     </div>
   );
 };
+
+export default AuthPage;

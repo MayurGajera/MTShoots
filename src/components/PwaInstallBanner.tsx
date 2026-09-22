@@ -1,3 +1,4 @@
+'use client';
 import React, { useState, useEffect } from 'react';
 import { Camera, X, Download, Share2, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,7 +16,8 @@ export const PwaInstallBanner: React.FC = () => {
   const [showIosGuide, setShowIosGuide] = useState(false);
 
   const [isDismissed, setIsDismissed] = useState(() => {
-    try { return localStorage.getItem('mtshoots_pwa_dismissed') === 'true'; } catch { return false; }
+    try { if (typeof window === 'undefined') return false;
+      return localStorage.getItem('mtshoots_pwa_dismissed') === 'true'; } catch { return false; }
   });
 
   const isIos = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;

@@ -1,5 +1,6 @@
+'use client';
 import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/navigation';
 
 /**
  * Scrolls to the top of the page on every route change with smooth behavior.
