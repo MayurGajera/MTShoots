@@ -158,9 +158,14 @@ export const LandingPage: React.FC = () => {
     const syncCity = () => {
       const storedCity = localStorage.getItem('mtshoots_city');
       const city = storedCity || selectedCity || '';
-      if (city && city !== searchCity) {
-        setSearchCity(city);
-      }
+
+      setSearchCity(prev => {
+        if (prev === '' && city) {
+          return prev;
+        }
+        if (!city) return prev;
+        return prev === city ? prev : city;
+      });
     };
 
     syncCity();
@@ -171,7 +176,7 @@ export const LandingPage: React.FC = () => {
       window.removeEventListener('mtshoots-city-changed', syncCity);
       window.removeEventListener('storage', syncCity);
     };
-  }, [selectedCity, searchCity]);
+  }, [selectedCity]);
 
   const [searchDate, setSearchDate] = useState(() => {
     const d = new Date();
@@ -213,7 +218,6 @@ export const LandingPage: React.FC = () => {
     if (searchCategory && searchCategory !== 'All') params.set('category', searchCategory);
     if (searchCity.trim()) {
       params.set('city', searchCity.trim());
-      handleLocationSelect(searchCity.trim());
     }
     if (searchDate) params.set('date', searchDate);
     navigate(`/photographers?${params.toString()}`);
@@ -280,7 +284,7 @@ export const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col">
+    <div className="min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col pt-16">
       {/* Unified Global Navbar */}
       <Navbar />
 
@@ -388,7 +392,6 @@ export const LandingPage: React.FC = () => {
                     onChange={setSearchCity}
                     onSelectCity={(city) => {
                       setSearchCity(city);
-                      handleLocationSelect(city);
                     }}
                     placeholder="e.g. Mumbai, Delhi, Jaipur"
                     inputClassName="text-xs font-bold text-[#181615] placeholder-[#8a726a]"
@@ -530,7 +533,7 @@ export const LandingPage: React.FC = () => {
         <div
           ref={featuredScrollRef}
           onScroll={handleFeaturedScroll}
-          className="flex overflow-x-auto snap-x snap-mandatory gap-5 pb-4 pt-1 px-4 -mx-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-8 md:overflow-visible no-scrollbar"
+          className={`flex overflow-x-auto snap-x snap-mandatory gap-5 pb-4 pt-1 px-4 -mx-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:grid md:grid-cols-2 ${featuredPhotographers.length >= 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-3'} md:gap-8 md:overflow-visible no-scrollbar`}
         >
           {featuredPhotographers.map(p => (
             <div

@@ -117,11 +117,20 @@ export const PhotographersPage: React.FC = () => {
     });
   };
 
-  // Filters - initialize from URL params
+  const normalizeCity = (value?: string | null): string => {
+    if (!value) return 'All';
+    const formatted = value.trim();
+    if (!formatted || ['all', 'all cities', 'all india'].includes(formatted.toLowerCase())) {
+      return 'All';
+    }
+    return formatted;
+  };
+
+  // Filters - initialize from URL params only so page-local filters reset cleanly
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
   const [selectedExperience, setSelectedExperience] = useState<ExperienceLevelFilterType>('all');
-  const [selectedCity, setSelectedCity] = useState(searchParams.get('city') || 'All');
+  const [selectedCity, setSelectedCity] = useState<string>(() => normalizeCity(searchParams.get('city') || 'All'));
   const [targetDate, setTargetDate] = useState<string>(searchParams.get('date') || '');
   const [budgetRange, setBudgetRange] = useState<BudgetRangeType>('all');
   const [onlyAvailableNow, setOnlyAvailableNow] = useState(false);
@@ -130,36 +139,22 @@ export const PhotographersPage: React.FC = () => {
   const [onlyAssistantIncluded, setOnlyAssistantIncluded] = useState(false);
   const [sortBy, setSortBy] = useState<SortOptionType>('featured');
 
-  // Keep state synced with URL search params changes
+  // Keep state synced with URL search params changes without overriding a user-selected city
   useEffect(() => {
     const cat = searchParams.get('category');
     setSelectedCategory(cat || 'all');
+
     const city = searchParams.get('city');
-    const activeCity = city || localStorage.getItem('mtshoots_city') || 'All';
-    setSelectedCity(activeCity);
+    setSelectedCity(normalizeCity(city || 'All'));
+
     const dateParam = searchParams.get('date');
-    if (dateParam) setTargetDate(dateParam);
+    setTargetDate(dateParam || '');
     const search = searchParams.get('search');
-    if (search !== null) setSearchQuery(search);
+    setSearchQuery(search ?? '');
   }, [searchParams]);
 
-  useEffect(() => {
-    const syncCity = () => {
-      const savedCity = localStorage.getItem('mtshoots_city');
-      if (savedCity) {
-        setSelectedCity(savedCity);
-      }
-    };
-
-    syncCity();
-    window.addEventListener('mtshoots-city-changed', syncCity);
-    window.addEventListener('storage', syncCity);
-
-    return () => {
-      window.removeEventListener('mtshoots-city-changed', syncCity);
-      window.removeEventListener('storage', syncCity);
-    };
-  }, []);
+  // Keep this page's city filter scoped to the results page only.
+  // Do not overwrite the page selection from global app-level city changes.
 
   // Keep synced with registered photographers storage events
   useEffect(() => {
@@ -202,26 +197,46 @@ export const PhotographersPage: React.FC = () => {
 
   const cities = useMemo(() => Array.from(new Set((photographers || []).map(p => p.baseCity).filter(Boolean))).sort(), [photographers]);
 
+  const baseCityAndDatePhotographers = useMemo(() => {
+    return (photographers || []).filter((p) => {
+      if (selectedCity && selectedCity !== 'All' && selectedCity !== 'All Cities' && selectedCity.trim() !== '') {
+        const cityLower = selectedCity.toLowerCase();
+        const matchesBase = p.baseCity && p.baseCity.toLowerCase().includes(cityLower);
+        const matchesLoc = p.location && p.location.toLowerCase().includes(cityLower);
+        const cityInLoc = cityLower.includes((p.baseCity || '').toLowerCase());
+        if (!matchesBase && !matchesLoc && !cityInLoc) return false;
+      }
+
+      if (targetDate && (p as any).blackoutDates && (p as any).blackoutDates.includes(targetDate)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [photographers, selectedCity, targetDate]);
+
   const photographerCountsByCategory = useMemo(() => {
     const counts: Record<string, number> = {
-      all: (photographers || []).length,
-      'All Categories': (photographers || []).length
+      all: baseCityAndDatePhotographers.length,
+      'All Categories': baseCityAndDatePhotographers.length
     };
+
     categoriesList.forEach(cat => {
       if (cat.id === 'all') {
-        counts[cat.id] = (photographers || []).length;
-        counts[cat.name] = (photographers || []).length;
+        counts[cat.id] = baseCityAndDatePhotographers.length;
+        counts[cat.name] = baseCityAndDatePhotographers.length;
       } else {
-        const matching = (photographers || []).filter(p => isPhotographerInCategory(p, cat.name) || isPhotographerInCategory(p, cat.id)).length;
+        const matching = baseCityAndDatePhotographers.filter(p => isPhotographerInCategory(p, cat.name) || isPhotographerInCategory(p, cat.id)).length;
         counts[cat.id] = matching;
         counts[cat.name] = matching;
       }
     });
+
     return counts;
-  }, [photographers, categoriesList]);
+  }, [baseCityAndDatePhotographers, categoriesList]);
 
   const filteredPhotographers = useMemo(() => {
-    return (photographers || []).filter(p => {
+    return baseCityAndDatePhotographers.filter(p => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         if (![p.name, p.location, p.baseCity, p.primaryCategory, ...(p.specialties || []), p.experienceLevel, p.bio, p.cameraFormat, ...(p.equipment || []), ...(p.clientRoster || [])].some(v => v?.toLowerCase().includes(q))) return false;
@@ -230,16 +245,6 @@ export const PhotographersPage: React.FC = () => {
         if (!isPhotographerInCategory(p, selectedCategory)) return false;
       }
       if (selectedExperience !== 'all' && p.experienceLevel !== selectedExperience) return false;
-      if (selectedCity && selectedCity !== 'All' && selectedCity !== 'All Cities' && selectedCity.trim() !== '') {
-        const cityLower = selectedCity.toLowerCase();
-        const matchesBase = p.baseCity && p.baseCity.toLowerCase().includes(cityLower);
-        const matchesLoc = p.location && p.location.toLowerCase().includes(cityLower);
-        const cityInLoc = cityLower.includes((p.baseCity || '').toLowerCase());
-        if (!matchesBase && !matchesLoc && !cityInLoc) return false;
-      }
-      if (targetDate && (p as any).blackoutDates && (p as any).blackoutDates.includes(targetDate)) {
-        return false;
-      }
       const dayRate = p.dayRate || 0;
       if (budgetRange === 'under-50k' && dayRate >= 50000) return false;
       if (budgetRange === '50k-100k' && (dayRate < 50000 || dayRate > 100000)) return false;
@@ -260,7 +265,7 @@ export const PhotographersPage: React.FC = () => {
       if (sortBy === 'turnaround') return (a.turnaroundDays || 0) - (b.turnaroundDays || 0);
       return 0;
     });
-  }, [photographers, searchQuery, selectedCategory, selectedExperience, selectedCity, targetDate, budgetRange, onlyAvailableNow, onlyTopRated, onlyFastDelivery, onlyAssistantIncluded, sortBy]);
+  }, [baseCityAndDatePhotographers, searchQuery, selectedCategory, selectedExperience, budgetRange, onlyAvailableNow, onlyTopRated, onlyFastDelivery, onlyAssistantIncluded, sortBy]);
 
   const handleToggleShortlist = (id: string) => {
     if (shortlistIds.includes(id)) {
@@ -348,7 +353,7 @@ export const PhotographersPage: React.FC = () => {
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
           photographerCountsByCategory={photographerCountsByCategory}
-          totalPhotographersCount={photographers.length}
+          totalPhotographersCount={baseCityAndDatePhotographers.length}
         />
 
         {targetDate && (
@@ -400,7 +405,7 @@ export const PhotographersPage: React.FC = () => {
           setSortBy={setSortBy}
           cities={cities}
           totalResults={filteredPhotographers.length}
-          totalCount={photographers.length}
+          totalCount={baseCityAndDatePhotographers.length}
           onResetFilters={handleResetFilters}
         />
 
@@ -425,7 +430,7 @@ export const PhotographersPage: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5 mt-6 mb-8">
             {filteredPhotographers.map((photographer) => (
               <PhotographerCard
                 key={photographer.id}
@@ -457,9 +462,8 @@ export const PhotographersPage: React.FC = () => {
       {isBookingModalOpen && (
         <BookingSheetModal
           onClose={() => { setIsBookingModalOpen(false); setBookingConfig(null); }}
-          photographer={bookingConfig?.photographer}
           photographers={photographers}
-          initialConfig={bookingConfig || (targetDate ? { selectedDate: targetDate } as any : undefined)}
+          initialConfig={bookingConfig || (targetDate ? { photographer: photographers[0], selectedDate: targetDate, durationType: 'full-day', usageRights: 'commercial-standard', selectedAddOns: [], totalCost: 0, shootLocation: photographers[0]?.location || '' } as any : undefined)}
           onConfirmBooking={handleConfirmBooking}
         />
       )}

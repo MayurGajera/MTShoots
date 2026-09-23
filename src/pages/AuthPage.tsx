@@ -36,6 +36,8 @@ export const AuthPage: React.FC = () => {
   const [role, setRole] = useState<UserRole>('customer');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showResetConfirmPassword, setShowResetConfirmPassword] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +139,15 @@ export const AuthPage: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const readAccounts = () => {
+        try {
+          return JSON.parse(localStorage.getItem('mtshoots_accounts') || '[]');
+        } catch {
+          return [];
+        }
+      };
+
       let finalName = fullName.trim();
       let finalCity = city.trim() || 'Mumbai';
       let finalAvatar = avatarUrl || '';
@@ -144,8 +155,30 @@ export const AuthPage: React.FC = () => {
       let userId = 'usr-' + Date.now();
 
       if (mode === 'signup') {
+        const accounts = readAccounts();
+        const match = accounts.find((account: any) => String(account.email).toLowerCase() === normalizedEmail);
+        if (match) {
+          setError('An account with this email already exists. Please sign in instead.');
+          setIsLoading(false);
+          return;
+        }
+
+        const newAccount = {
+          id: userId,
+          fullName: finalName,
+          email: normalizedEmail,
+          password,
+          role: finalRole,
+          city: finalCity,
+          avatar: finalAvatar,
+          createdAt: new Date().toISOString()
+        };
+
+        accounts.push(newAccount);
+        localStorage.setItem('mtshoots_accounts', JSON.stringify(accounts));
+
         const dbUser = await upsertUser({
-          email: email.trim().toLowerCase(),
+          email: normalizedEmail,
           full_name: finalName,
           city: finalCity,
           avatar_url: finalAvatar,
@@ -153,15 +186,30 @@ export const AuthPage: React.FC = () => {
         });
         if (dbUser?.id) userId = dbUser.id;
       } else {
-        const dbUser = await getUserByEmail(email.trim().toLowerCase());
-        if (dbUser) {
-          userId = dbUser.id || userId;
-          finalName = dbUser.full_name || finalName || email.split('@')[0].replace(/[._]/g, ' ');
-          finalCity = dbUser.city || finalCity;
-          finalAvatar = dbUser.avatar_url || finalAvatar;
-          finalRole = dbUser.role || finalRole;
+        const accounts = readAccounts();
+        const matchedAccount = accounts.find((account: any) => {
+          return String(account.email).toLowerCase() === normalizedEmail && String(account.password) === String(password);
+        });
+
+        if (!matchedAccount) {
+          const dbUser = await getUserByEmail(normalizedEmail);
+          if (dbUser && dbUser.full_name && password.length >= 6) {
+            userId = dbUser.id || userId;
+            finalName = dbUser.full_name || finalName || email.split('@')[0].replace(/[._]/g, ' ');
+            finalCity = dbUser.city || finalCity;
+            finalAvatar = dbUser.avatar_url || finalAvatar;
+            finalRole = (dbUser.role === 'photographer' || dbUser.role === 'customer') ? dbUser.role : finalRole;
+          } else {
+            setError('No account matched this email and password. Please create an account or check your details.');
+            setIsLoading(false);
+            return;
+          }
         } else {
-          finalName = email.split('@')[0].replace(/[._]/g, ' ') || 'User';
+          userId = matchedAccount.id || userId;
+          finalName = matchedAccount.fullName || finalName || email.split('@')[0].replace(/[._]/g, ' ');
+          finalCity = matchedAccount.city || finalCity;
+          finalAvatar = matchedAccount.avatar || finalAvatar;
+          finalRole = (matchedAccount.role === 'photographer' || matchedAccount.role === 'customer') ? matchedAccount.role : finalRole;
         }
       }
 
@@ -404,25 +452,45 @@ export const AuthPage: React.FC = () => {
                   <form onSubmit={handleResetPassword} className="space-y-4">
                     <div>
                       <label className="block text-xs font-bold text-[#181615] mb-1.5">New Password (min 6 characters)</label>
-                      <input
-                        type="password"
-                        value={resetPassword}
-                        onChange={(e) => setResetPassword(e.target.value)}
-                        placeholder="Enter new password"
-                        required
-                        className="w-full h-11 px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs sm:text-sm text-[#181615] placeholder:text-[#8a726a]/60 focus:outline-none focus:border-[#C85A32] focus:ring-2 focus:ring-[#C85A32]/25 transition-all"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showResetPassword ? 'text' : 'password'}
+                          value={resetPassword}
+                          onChange={(e) => setResetPassword(e.target.value)}
+                          placeholder="Enter new password"
+                          required
+                          className="w-full h-11 px-3.5 py-2.5 pr-10 rounded-xl border border-[#E7E1DA] bg-white text-xs sm:text-sm text-[#181615] placeholder:text-[#8a726a]/60 focus:outline-none focus:border-[#C85A32] focus:ring-2 focus:ring-[#C85A32]/25 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowResetPassword((prev) => !prev)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a726a] hover:text-[#181615] cursor-pointer p-1"
+                          tabIndex={-1}
+                        >
+                          {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-[#181615] mb-1.5">Confirm New Password</label>
-                      <input
-                        type="password"
-                        value={resetConfirmPassword}
-                        onChange={(e) => setResetConfirmPassword(e.target.value)}
-                        placeholder="Confirm new password"
-                        required
-                        className="w-full h-11 px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs sm:text-sm text-[#181615] placeholder:text-[#8a726a]/60 focus:outline-none focus:border-[#C85A32] focus:ring-2 focus:ring-[#C85A32]/25 transition-all"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showResetConfirmPassword ? 'text' : 'password'}
+                          value={resetConfirmPassword}
+                          onChange={(e) => setResetConfirmPassword(e.target.value)}
+                          placeholder="Confirm new password"
+                          required
+                          className="w-full h-11 px-3.5 py-2.5 pr-10 rounded-xl border border-[#E7E1DA] bg-white text-xs sm:text-sm text-[#181615] placeholder:text-[#8a726a]/60 focus:outline-none focus:border-[#C85A32] focus:ring-2 focus:ring-[#C85A32]/25 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowResetConfirmPassword((prev) => !prev)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a726a] hover:text-[#181615] cursor-pointer p-1"
+                          tabIndex={-1}
+                        >
+                          {showResetConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     <button
                       type="submit"

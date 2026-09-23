@@ -1,7 +1,7 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PHOTOGRAPHY_CATEGORIES, PhotographyCategory } from '../data/categories';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchCategories } from '@/lib/supabase';
 
 interface CategoryFlowBarProps {
@@ -18,6 +18,9 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
   totalPhotographersCount
 }) => {
   const [categories, setCategories] = useState<PhotographyCategory[]>(PHOTOGRAPHY_CATEGORIES);
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [hoverPreviewPosition, setHoverPreviewPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     fetchCategories().then(dbCats => {
@@ -59,9 +62,19 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
         )}
       </div>
 
-      {/* Category Scroll Stream */}
-      <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-none no-scrollbar w-full min-w-0 px-1 snap-x snap-mandatory">
-        {categories.map((cat: PhotographyCategory) => {
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="Scroll category selector left"
+          onClick={() => scrollRef.current?.scrollBy({ left: -220, behavior: 'smooth' })}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E7E1DA] bg-white text-[#181615] shadow-sm transition hover:border-[#C85A32]/60 hover:text-[#C85A32]"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        {/* Category Scroll Stream */}
+        <div ref={scrollRef} className="flex items-center gap-2.5 overflow-x-auto pb-2 pt-1 scrollbar-none no-scrollbar w-full min-w-0 px-1 snap-x snap-mandatory">
+          {categories.map((cat: PhotographyCategory) => {
           const isAll = cat.id === 'all';
           const isSelected = isAll
             ? isAllSelected
@@ -79,19 +92,29 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
             <button
               key={cat.id}
               id={`category-flow-btn-${cat.id}`}
+              type="button"
+              onMouseEnter={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                setHoveredCategory(cat.id);
+                setHoverPreviewPosition({
+                  x: rect.left + rect.width / 2,
+                  y: rect.top
+                });
+              }}
+              onMouseLeave={() => setHoveredCategory(null)}
               onClick={() => onSelectCategory(isAll ? 'all' : cat.name)}
-              className={`group flex items-center space-x-2.5 px-3 py-2 rounded-2xl border transition-all duration-200 shrink-0 cursor-pointer text-left snap-start ${
+              className={`group flex items-center gap-2 px-2.5 py-1.75 rounded-2xl border transition-all duration-200 shrink-0 cursor-pointer text-left snap-start ${
                 isSelected
                   ? 'bg-white border-[#C85A32] ring-2 ring-[#C85A32]/20 shadow-md scale-[1.02]'
                   : 'bg-white/80 border-[#E7E1DA] hover:bg-white hover:border-[#dec0b7] hover:shadow-xs'
               }`}
             >
               {/* Category Thumbnail */}
-              <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-[#E7E1DA]/60 bg-[#F4EFEB]">
+              <div className="relative w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-[#E7E1DA]/60 bg-[#F4EFEB]">
                 <img
                   src={cat.image}
                   alt={cat.name}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-300"
                   loading="lazy"
                   referrerPolicy="no-referrer"
                 />
@@ -101,24 +124,55 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
               </div>
 
               {/* Category Label and Count */}
-              <div className="pr-1.5">
+              <div className="pr-1">
                 <div
-                  className={`text-xs font-bold leading-tight whitespace-nowrap transition-colors ${
+                  className={`text-[11px] sm:text-xs font-bold leading-tight whitespace-nowrap transition-colors ${
                     isSelected ? 'text-[#C85A32]' : 'text-[#181615] group-hover:text-[#C85A32]'
                   }`}
                 >
                   {cat.shortName}
                 </div>
-                <div className="text-[11px] text-[#8a726a] flex items-center space-x-1 mt-0.5">
+                <div className="text-[10px] text-[#8a726a] flex items-center space-x-1 mt-0.5">
                   <span className="tabular-nums font-medium">
-                    {count === 1 ? '1 Photographer' : `${count} Photographers`}
+                    {count === 1 ? '1' : count}
                   </span>
                 </div>
               </div>
             </button>
           );
-        })}
+          })}
+        </div>
+
+        <button
+          type="button"
+          aria-label="Scroll category selector right"
+          onClick={() => scrollRef.current?.scrollBy({ left: 220, behavior: 'smooth' })}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E7E1DA] bg-white text-[#181615] shadow-sm transition hover:border-[#C85A32]/60 hover:text-[#C85A32]"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
+
+      {hoveredCategory && (
+        <div
+          className="pointer-events-none fixed z-[60]"
+          style={{
+            left: hoverPreviewPosition.x,
+            top: hoverPreviewPosition.y,
+            transform: 'translate(-50%, -118%)'
+          }}
+        >
+          <div className="flex items-center justify-center rounded-2xl border border-[#E7E1DA] bg-white/95 p-1.5 shadow-xl backdrop-blur-sm">
+            <img
+              src={categories.find(cat => cat.id === hoveredCategory)?.image || ''}
+              alt={categories.find(cat => cat.id === hoveredCategory)?.name || 'Category'}
+              className="h-28 w-28 rounded-xl object-cover"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

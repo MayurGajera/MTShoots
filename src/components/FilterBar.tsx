@@ -91,11 +91,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     }).catch(() => {});
   }, []);
   // Compute active filters
+  const normalizedSelectedCity = selectedCity === 'All Cities' ? 'All' : selectedCity;
+
   const activeFilters = [
     searchQuery.trim() !== '',
     selectedCategory !== 'all' && selectedCategory !== 'All Categories',
     selectedExperience !== 'all',
-    selectedCity !== 'All',
+    normalizedSelectedCity !== 'All',
     budgetRange !== 'all',
     onlyAvailableNow,
     onlyTopRated,
@@ -219,8 +221,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             <span className="text-[#8a726a] font-normal">City:</span>
             <select
               id="city-location-select"
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
+              value={normalizedSelectedCity}
+              onChange={(e) => {
+                const nextCity = e.target.value === 'All Cities' ? 'All' : e.target.value;
+                setSelectedCity(nextCity);
+              }}
               className="bg-transparent focus:outline-none cursor-pointer text-xs font-medium text-[#181615]"
             >
               <option value="All">All Cities</option>

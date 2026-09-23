@@ -28,7 +28,7 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
   inputClassName = '',
   className = ''
 }) => {
-  const { handleLocationSelect, selectedCity } = useApp();
+  const { selectedCity } = useApp();
   const [cities, setCities] = useState<string[]>(DEFAULT_MAJOR_CITIES);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -65,10 +65,6 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
     setIsOpen(false);
     setHighlightedIndex(-1);
 
-    // Persist site-wide
-    if (handleLocationSelect) {
-      handleLocationSelect(city);
-    }
     if (onSelectCity) {
       onSelectCity(city);
     }

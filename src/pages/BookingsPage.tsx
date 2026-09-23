@@ -32,14 +32,24 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
   photographers: propPhotographers,
   onOpenNewBooking
 }) => {
-  // Check if logged in user is a photographer
-  const [currentUser] = useState<any>(() => {
-    try {
-      if (typeof window === 'undefined') return null;
-      const stored = localStorage.getItem('mtshoots_user');
-      return stored ? JSON.parse(stored) : null;
-    } catch { return null; }
-  });
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const readCurrentUser = () => {
+      try {
+        if (typeof window === 'undefined') return null;
+        const stored = localStorage.getItem('mtshoots_user');
+        return stored ? JSON.parse(stored) : null;
+      } catch { return null; }
+    };
+
+    const syncUser = () => setCurrentUser(readCurrentUser());
+    syncUser();
+
+    const onAuthChanged = () => syncUser();
+    window.addEventListener('mtshoots-auth-changed', onAuthChanged);
+    return () => window.removeEventListener('mtshoots-auth-changed', onAuthChanged);
+  }, []);
 
   if (currentUser?.role === 'photographer') {
     return <PhotographerDashboard user={currentUser} onOpenNewBooking={onOpenNewBooking} />;
@@ -48,6 +58,10 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
   const app = useApp();
   const bookings = propBookings ?? app?.bookings ?? [];
   const effectiveOpenNewBooking = onOpenNewBooking ?? app?.openNewBooking;
+  const currentUserEmail = currentUser?.email?.toLowerCase();
+  const visibleBookings = currentUserEmail
+    ? bookings.filter((booking) => String(booking.artDirectorEmail || '').toLowerCase() === currentUserEmail)
+    : [];
 
   const [photographers, setPhotographers] = useState<Photographer[]>(() => propPhotographers || getAllPhotographers());
 
@@ -59,18 +73,50 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
     }
   }, [propPhotographers]);
 
-  const [expandedId, setExpandedId] = useState<string | null>(() => bookings[0]?.id || null);
+  const [expandedId, setExpandedId] = useState<string | null>(() => visibleBookings[0]?.id || null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!expandedId && bookings.length > 0) {
-      setExpandedId(bookings[0]?.id || null);
+    if (!expandedId && visibleBookings.length > 0) {
+      setExpandedId(visibleBookings[0]?.id || null);
     }
-  }, [bookings, expandedId]);
+  }, [visibleBookings, expandedId]);
 
-  const activeBooking = bookings.find(b => b.id === expandedId) || bookings[0];
+  const activeBooking = visibleBookings.find(b => b.id === expandedId) || visibleBookings[0];
 
-  if (bookings.length === 0) {
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F5] flex flex-col">
+        <Navbar
+          currentTab="callsheets"
+          setCurrentTab={() => {}}
+          bookingCount={0}
+          shortlistCount={0}
+          onOpenNewBooking={onOpenNewBooking}
+        />
+        <main className="flex-1 flex items-center justify-center px-4 py-20">
+          <div className="text-center max-w-md">
+            <div className="w-20 h-20 rounded-2xl bg-[#F4EFEB] flex items-center justify-center mx-auto mb-6">
+              <Calendar className="w-10 h-10 text-[#8a726a]" />
+            </div>
+            <h2 className="font-serif text-2xl font-bold text-[#181615] mb-3">Sign in to view bookings</h2>
+            <p className="text-sm text-[#57423b] leading-relaxed mb-8">
+              Your booking history is tied to your account, so we can keep each client’s bookings private and secure.
+            </p>
+            <Link
+              to="/auth"
+              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-[#C85A32] text-white text-sm font-bold hover:bg-[#B24E2A] transition-all shadow-lg cursor-pointer"
+            >
+              <User className="w-4 h-4" /> Sign In
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (visibleBookings.length === 0) {
     return (
       <div className="min-h-screen bg-[#FAF8F5] flex flex-col">
         <Navbar
@@ -107,7 +153,7 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
       <Navbar
         currentTab="callsheets"
         setCurrentTab={() => {}}
-        bookingCount={bookings.length}
+        bookingCount={visibleBookings.length}
         shortlistCount={0}
         onOpenNewBooking={onOpenNewBooking}
       />
@@ -123,7 +169,7 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
             </div>
             <h1 className="font-serif text-3xl font-bold text-[#181615]">My Bookings</h1>
             <p className="text-sm text-[#57423b] mt-1">
-              {bookings.length} booking{bookings.length !== 1 ? 's' : ''} • View and manage your photography shoots
+              {visibleBookings.length} booking{visibleBookings.length !== 1 ? 's' : ''} • View and manage your photography shoots
             </p>
           </div>
           <Link
@@ -137,7 +183,7 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: Booking List */}
           <div className="lg:col-span-1 space-y-3">
-            {bookings.map(booking => {
+            {visibleBookings.map(booking => {
               const status = STATUS_CONFIG[booking.status] || STATUS_CONFIG.confirmed;
               const StatusIcon = status.icon;
               const isExpanded = expandedId === booking.id;

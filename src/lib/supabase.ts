@@ -34,6 +34,50 @@ export const getSupabaseClient = (): SupabaseClient | null => {
   return _supabaseClient;
 };
 
+export const extractSupabaseStoragePath = (url?: string): string | null => {
+  if (!url || typeof url !== 'string') return null;
+
+  try {
+    const parsed = new URL(url);
+    const match = parsed.pathname.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/i);
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch {
+    const match = url.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/i);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+};
+
+export const deleteSupabaseStorageFileByUrl = async (url?: string): Promise<boolean> => {
+  if (!url) return false;
+
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  const path = extractSupabaseStoragePath(url);
+  if (!path) return false;
+
+  try {
+    const bucket = path.split('/')[0];
+    const objectPath = path.slice(bucket.length + 1);
+    const { error } = await client.storage.from(bucket).remove([objectPath]);
+    if (error) {
+      console.warn('Supabase storage delete failed:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Supabase storage delete exception:', err);
+    return false;
+  }
+};
+
+export const replaceSupabaseStorageFileByUrl = async (oldUrl?: string, newUrl?: string): Promise<boolean> => {
+  if (oldUrl && oldUrl !== newUrl) {
+    await deleteSupabaseStorageFileByUrl(oldUrl);
+  }
+  return Boolean(newUrl);
+};
+
 // Ready-to-execute PostgreSQL Schema for Supabase SQL Editor
 export const SUPABASE_SQL_SCHEMA = `-- ==============================================================================
 -- PROVENANCE x SUPABASE POSTGRESQL SCHEMA (Deploy on Supabase & Vercel)
