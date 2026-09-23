@@ -5,7 +5,7 @@ import { useApp } from '@/context/AppContext';
 import {
   Camera, Star, MapPin, Calendar, Clock, Award, ShieldCheck,
   Heart, Share2, ArrowLeft, ChevronLeft, ChevronRight, Check,
-  Sparkles, CheckCircle2, Maximize2, ExternalLink, Zap, Info,
+  Sparkles, CheckCircle2, ExternalLink, Zap, Info,
   Sliders, ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -94,52 +94,70 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
       }
     };
 
-    // Hero image first
+    const pushPhoto = (url: string, title: string, category: string, specs?: string, item?: PortfolioItem) => {
+      const normalized = normalizeUrl(url);
+      if (!url || seen.has(normalized)) return;
+      list.push({ url, title, category, specs, item });
+      seen.add(normalized);
+    };
+
     if (photographer.heroImage) {
-      list.push({
-        url: photographer.heroImage,
-        title: `${photographer.name}  -  Signature Frame`,
-        category: photographer.primaryCategory,
-        specs: photographer.cameraFormat
-      });
-      seen.add(normalizeUrl(photographer.heroImage));
+      pushPhoto(
+        photographer.heroImage,
+        `${photographer.name} - Signature Frame`,
+        photographer.primaryCategory,
+        photographer.cameraFormat
+      );
     }
 
-    // Home slider photos
     if (photographer.homeSliderPhotos) {
       photographer.homeSliderPhotos.forEach((img, i) => {
-        const norm = normalizeUrl(img);
-        if (img && !seen.has(norm)) {
-          list.push({
-            url: img,
-            title: `${photographer.primaryCategory} Series #${i + 1}`,
-            category: photographer.primaryCategory,
-            specs: photographer.cameraFormat
-          });
-          seen.add(norm);
-        }
+        pushPhoto(
+          img,
+          `${photographer.primaryCategory} Series #${i + 1}`,
+          photographer.primaryCategory,
+          photographer.cameraFormat
+        );
       });
     }
 
-    // Portfolio items
     if (photographer.portfolio) {
       photographer.portfolio.forEach(item => {
-        const norm = normalizeUrl(item.imageUrl);
-        if (item.imageUrl && !seen.has(norm)) {
-          list.push({
-            url: item.imageUrl,
-            title: item.title,
-            category: item.category,
-            specs: item.techSpecs,
-            item
-          });
-          seen.add(norm);
-        }
+        pushPhoto(item.imageUrl, item.title, item.category, item.techSpecs, item);
       });
     }
 
     return list;
   }, [photographer]);
+
+  const lightboxItems = React.useMemo<PortfolioItem[]>(() => {
+    if (!photographer) return [];
+
+    return allPhotos.map((photo, index) => {
+      const base = photo.item ?? {
+        id: `lightbox-${photographer.id}-${index}`,
+        title: photo.title,
+        clientOrSeries: photographer.primaryCategory,
+        category: photo.category,
+        imageUrl: photo.url,
+        aspectRatio: '16:9' as const,
+        year: '2026',
+        location: photographer.location,
+        techSpecs: photo.specs || photographer.cameraFormat,
+        story: photo.title,
+      };
+
+      return {
+        ...base,
+        id: base.id || `lightbox-${photographer.id}-${index}`,
+        title: base.title || photo.title,
+        category: base.category || photo.category,
+        imageUrl: base.imageUrl || photo.url,
+        location: base.location || photographer.location,
+        techSpecs: base.techSpecs || photo.specs || photographer.cameraFormat,
+      };
+    });
+  }, [allPhotos, photographer]);
 
   // Slider State
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -572,21 +590,18 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
                       transition={{ duration: 0.35, ease: 'easeOut' }}
                       className="max-h-full max-w-full w-auto h-auto object-contain rounded-xl shadow-2xl cursor-pointer hover:brightness-105 transition-all"
                       onClick={() => {
-                        if (currentPhoto?.item) {
-                          setLightboxItem(currentPhoto.item);
-                        } else {
-                          setLightboxItem({
-                            id: `slide-${currentIndex}`,
-                            title: currentPhoto?.title || photographer.name,
-                            clientOrSeries: photographer.primaryCategory,
-                            category: photographer.primaryCategory,
-                            imageUrl: currentPhoto?.url || '',
-                            aspectRatio: '16:9',
-                            year: '2026',
-                            location: photographer.location,
-                            techSpecs: currentPhoto?.specs || photographer.cameraFormat
-                          });
-                        }
+                        const nextItem = lightboxItems[currentIndex] ?? {
+                          id: `slide-${currentIndex}`,
+                          title: currentPhoto?.title || photographer.name,
+                          clientOrSeries: photographer.primaryCategory,
+                          category: currentPhoto?.category || photographer.primaryCategory,
+                          imageUrl: currentPhoto?.url || '',
+                          aspectRatio: '16:9',
+                          year: '2026',
+                          location: photographer.location,
+                          techSpecs: currentPhoto?.specs || photographer.cameraFormat
+                        };
+                        setLightboxItem(nextItem);
                       }}
                     />
                   </AnimatePresence>
@@ -614,26 +629,13 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
                   </>
                 )}
 
-                {/* Top Bar inside Slider: Counter Badge & Fullscreen Lightbox trigger */}
-                <div className="absolute top-3 inset-x-3 sm:top-4 sm:inset-x-4 z-20 flex items-center justify-between pointer-events-auto">
+                {/* Top Bar inside Slider: Counter Badge */}
+                <div className="absolute top-3 inset-x-3 sm:top-4 sm:inset-x-4 z-20 flex items-center justify-start pointer-events-auto">
                   {allPhotos.length > 1 ? (
                     <span className="text-xs text-white/90 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/15 font-mono shadow-sm">
                       {currentIndex + 1} / {allPhotos.length}
                     </span>
                   ) : <div />}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (currentPhoto?.item) {
-                        setLightboxItem(currentPhoto.item);
-                      }
-                    }}
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/50 hover:bg-black/80 text-white backdrop-blur-md flex items-center justify-center transition-transform hover:scale-105 border border-white/20 cursor-pointer shadow-sm"
-                    title="View Fullscreen"
-                  >
-                    <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
                 </div>
 
                 {/* Bottom Caption & Tech Specs Overlay */}
@@ -1077,7 +1079,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
       {lightboxItem && (
         <MediaLightbox
           item={lightboxItem}
-          allItems={photographer.portfolio || []}
+          allItems={lightboxItems}
           onClose={() => setLightboxItem(null)}
           onNavigate={item => setLightboxItem(item)}
           onBookSimilar={handleStartBooking}

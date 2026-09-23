@@ -82,4 +82,5 @@ export interface BookingRequest {
   createdAt: string;
   notes?: string;
   shotListOverview?: string;
+  photoshootStyle?: string;
 }

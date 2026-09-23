@@ -215,11 +215,20 @@ export const Navbar: React.FC<NavbarProps> = ({
         if (city) setCurrentCity(city);
       } catch {}
     };
+
+    const handleCityChange = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+      const city = customEvent.detail || localStorage.getItem('mtshoots_city') || 'All India';
+      setCurrentCity(city);
+    };
+
     window.addEventListener('storage', handleStorage);
     window.addEventListener('mtshoots-auth-changed', handleStorage);
+    window.addEventListener('mtshoots-city-changed', handleCityChange);
     return () => {
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('mtshoots-auth-changed', handleStorage);
+      window.removeEventListener('mtshoots-city-changed', handleCityChange);
     };
   }, []);
 

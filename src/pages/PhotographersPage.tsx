@@ -135,12 +135,31 @@ export const PhotographersPage: React.FC = () => {
     const cat = searchParams.get('category');
     setSelectedCategory(cat || 'all');
     const city = searchParams.get('city');
-    if (city) setSelectedCity(city);
+    const activeCity = city || localStorage.getItem('mtshoots_city') || 'All';
+    setSelectedCity(activeCity);
     const dateParam = searchParams.get('date');
     if (dateParam) setTargetDate(dateParam);
     const search = searchParams.get('search');
     if (search !== null) setSearchQuery(search);
   }, [searchParams]);
+
+  useEffect(() => {
+    const syncCity = () => {
+      const savedCity = localStorage.getItem('mtshoots_city');
+      if (savedCity) {
+        setSelectedCity(savedCity);
+      }
+    };
+
+    syncCity();
+    window.addEventListener('mtshoots-city-changed', syncCity);
+    window.addEventListener('storage', syncCity);
+
+    return () => {
+      window.removeEventListener('mtshoots-city-changed', syncCity);
+      window.removeEventListener('storage', syncCity);
+    };
+  }, []);
 
   // Keep synced with registered photographers storage events
   useEffect(() => {
