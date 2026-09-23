@@ -1,5 +1,5 @@
 ﻿import type { Metadata } from 'next';
-import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import '@/index.css';
 import { ClientShell } from '@/components/ClientShell';
 
@@ -9,7 +9,7 @@ const plusJakarta = Plus_Jakarta_Sans({
   display: 'swap',
 });
 
-const playfair = Playfair_Display({
+const fontSerif = Plus_Jakarta_Sans({
   subsets: ['latin'],
   variable: '--font-serif',
   display: 'swap',
@@ -69,7 +69,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={plusJakarta.variable + ' ' + playfair.variable}>
+    <html lang="en" className={plusJakarta.variable + ' ' + fontSerif.variable} suppressHydrationWarning>
             <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -83,7 +83,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="MTShoots" />
       </head>
-      <body className="font-sans antialiased bg-[#FAF8F5] text-[#181615] max-w-full overflow-x-clip">
+      <body className="font-sans antialiased bg-[#FAF8F5] text-[#181615] max-w-full overflow-x-clip" suppressHydrationWarning>
         <ClientShell>{children}</ClientShell>
       </body>
     </html>

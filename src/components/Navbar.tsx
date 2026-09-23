@@ -17,7 +17,11 @@ import {
   LogOut,
   Upload,
   Check,
-  ShieldCheck
+  ShieldCheck,
+  CheckCircle2,
+  Trash2,
+  Laptop,
+  Globe
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/lib/navigation';
 import { motion, AnimatePresence } from 'motion/react';
@@ -390,6 +394,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const hasUserAvatar = Boolean(user?.avatar && user.avatar.trim());
 
   return (
+  <>
     <header className="sticky top-0 z-40 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#E7E1DA] transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-18 gap-3">
@@ -694,10 +699,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </AnimatePresence>
       </div>
 
-            {/* Account Settings Modal */}
+    </header>
+
+    {/* Account Settings Modal */}
       {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col p-5 sm:p-6 space-y-4 shadow-2xl border border-[#E7E1DA] overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] my-auto flex flex-col p-5 sm:p-6 space-y-4 shadow-2xl border border-[#E7E1DA] overflow-hidden">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E1DA] shrink-0">
               <div className="flex items-center gap-2">
@@ -1063,8 +1070,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Change Password Modal */}
       {isPasswordModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-[#E7E1DA]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] my-auto overflow-y-auto p-6 space-y-4 shadow-2xl border border-[#E7E1DA]">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E1DA]">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-[#C85A32]" />
@@ -1145,10 +1152,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#181615] text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl border border-white/10 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <span>âœ"</span>
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
-    </header>
+      </>
   );
 };
