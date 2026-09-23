@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X,
   Star,
@@ -8,6 +8,7 @@ import {
   Clock,
   Camera,
   Award,
+  ChevronLeft,
   ChevronRight,
   Heart,
   FileText,
@@ -86,20 +87,86 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
     }
   ];
 
-  const daysInMonth = 30;
-  const startDayOfWeek = 2;
-  const calendarDays: Array<{ day: number; dateStr: string; isPast: boolean; isAvailable: boolean; isSelected: boolean } | null> = [];
+  // Calendar multi-month state with 6-month past window
+  const today = useMemo(() => new Date(), []);
 
-  for (let i = 0; i < startDayOfWeek; i++) {
-    calendarDays.push(null);
-  }
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `2026-09-${day.toString().padStart(2, '0')}`;
-    const isPast = day < 21;
-    const isAvailable = !isPast && day % 2 === 0;
-    const isSelected = selectedDate === dateStr;
-    calendarDays.push({ day, dateStr, isPast, isAvailable, isSelected });
-  }
+  const minAllowedDate = useMemo(() => {
+    const d = new Date(today);
+    d.setMonth(d.getMonth() - 6);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [today]);
+
+  const maxAllowedDate = useMemo(() => {
+    const d = new Date(today);
+    d.setMonth(d.getMonth() + 18);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, [today]);
+
+  const [calendarYear, setCalendarYear] = useState<number>(() => today.getFullYear());
+  const [calendarMonth, setCalendarMonth] = useState<number>(() => today.getMonth());
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const isPrevMonthDisabled = useMemo(() => {
+    const lastDayOfPrevMonth = new Date(calendarYear, calendarMonth, 0, 23, 59, 59);
+    return lastDayOfPrevMonth.getTime() < minAllowedDate.getTime();
+  }, [calendarYear, calendarMonth, minAllowedDate]);
+
+  const handlePrevMonth = () => {
+    if (isPrevMonthDisabled) return;
+    if (calendarMonth === 0) {
+      setCalendarYear(y => y - 1);
+      setCalendarMonth(11);
+    } else {
+      setCalendarMonth(m => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (calendarMonth === 11) {
+      setCalendarYear(y => y + 1);
+      setCalendarMonth(0);
+    } else {
+      setCalendarMonth(m => m + 1);
+    }
+  };
+
+  const daysInCurrentMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+  const startDayOfWeek = new Date(calendarYear, calendarMonth, 1).getDay();
+
+  const calendarDays = useMemo(() => {
+    const days: Array<{
+      day: number;
+      dateStr: string;
+      isDisabled: boolean;
+      isAvailable: boolean;
+      isSelected: boolean;
+    } | null> = [];
+
+    for (let i = 0; i < startDayOfWeek; i++) {
+      days.push(null);
+    }
+
+    for (let day = 1; day <= daysInCurrentMonth; day++) {
+      const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const cellDate = new Date(calendarYear, calendarMonth, day, 0, 0, 0, 0);
+
+      const isOlderThan6Months = cellDate.getTime() < minAllowedDate.getTime();
+      const isBeyondMax = cellDate.getTime() > maxAllowedDate.getTime();
+      const isDisabled = isOlderThan6Months || isBeyondMax;
+      const isSelected = selectedDate === dateStr;
+      const isAvailable = !isDisabled;
+
+      days.push({ day, dateStr, isDisabled, isAvailable, isSelected });
+    }
+
+    return days;
+  }, [calendarYear, calendarMonth, daysInCurrentMonth, startDayOfWeek, minAllowedDate, maxAllowedDate, selectedDate]);
 
   const displayedPortfolio = activePortfolioTab === 'all'
     ? photographer.portfolio
@@ -108,7 +175,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
   const uniqueCategories = Array.from(new Set(photographer.portfolio.map((p) => p.category)));
 
   const handleShareProfile = async () => {
-    const shareText = `${photographer.name} — ${photographer.location} — ${window.location.href}`;
+    const shareText = `${photographer.name}  -  ${photographer.location}  -  ${window.location.href}`;
     try {
       await navigator.clipboard.writeText(shareText);
       setShareCopied(true);
@@ -298,7 +365,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
                   <button
                     type="button"
                     onClick={() => {
-                      const text = `${photographer.name} office: ${photographer.officeLocation || photographer.location} — ${photographer.officeMapUrl || `https://www.google.com/maps?q=${encodeURIComponent(photographer.officeLocation || photographer.location)}`}`;
+                      const text = `${photographer.name} office: ${photographer.officeLocation || photographer.location}  -  ${photographer.officeMapUrl || `https://www.google.com/maps?q=${encodeURIComponent(photographer.officeLocation || photographer.location)}`}`;
                       navigator.clipboard?.writeText(text).catch(() => window.alert('Unable to copy the map link on this device.'));
                     }}
                     className="w-full rounded-lg bg-[#181615] px-3 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-white hover:bg-[#342f2d]"
@@ -474,7 +541,28 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
                     <CalendarIcon className="w-3.5 h-3.5 text-[#C85A32]" />
                     <span>Choose Shoot Date</span>
                   </label>
-                  <span className="text-xs font-semibold text-[#57423b]">September 2026</span>
+                  <div className="flex items-center gap-1 bg-[#FAF8F5] px-2 py-0.5 rounded-xl border border-[#E7E1DA]">
+                    <button
+                      type="button"
+                      onClick={handlePrevMonth}
+                      disabled={isPrevMonthDisabled}
+                      className="p-1 rounded-md hover:bg-white text-[#181615] disabled:opacity-25 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      title={isPrevMonthDisabled ? "Cannot select dates beyond previous 6 months" : "Previous Month"}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs font-bold text-[#181615] min-w-[105px] text-center select-none">
+                      {monthNames[calendarMonth]} {calendarYear}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleNextMonth}
+                      className="p-1 rounded-md hover:bg-white text-[#181615] transition-colors cursor-pointer"
+                      title="Next Month"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-[#FAF8F5] p-3 rounded-xl border border-[#E7E1DA]">
@@ -491,27 +579,28 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
                   <div className="grid grid-cols-7 gap-1 pt-1.5 text-xs text-center">
                     {calendarDays.map((cell, idx) => {
                       if (!cell) {
-                        return <div key={`empty-${idx}`} className="h-8" />;
+                        return <div key={'empty-' + idx} className="h-8" />;
                       }
 
-                      const { day, dateStr, isPast, isAvailable, isSelected } = cell;
+                      const { day, dateStr, isDisabled, isAvailable, isSelected } = cell;
 
                       return (
                         <button
                           key={dateStr}
                           type="button"
-                          disabled={isPast || !isAvailable}
+                          disabled={isDisabled}
                           onClick={() => setSelectedDate(dateStr)}
-                          className={`h-8 rounded-md flex flex-col items-center justify-center relative transition-all ${
+                          title={isDisabled ? "Date beyond previous 6-month window is disabled" : dateStr}
+                          className={"h-8 rounded-md flex flex-col items-center justify-center relative transition-all " + (
                             isSelected
-                              ? 'bg-[#C85A32] text-white font-bold shadow-sm'
-                              : isAvailable && !isPast
-                              ? 'hover:bg-[#EAF4ED] text-[#181615] font-medium cursor-pointer'
-                              : 'text-[#dec0b7] cursor-not-allowed'
-                          }`}
+                              ? "bg-[#C85A32] text-white font-bold shadow-sm"
+                              : !isDisabled
+                              ? "hover:bg-[#EAF4ED] text-[#181615] font-medium cursor-pointer"
+                              : "text-[#dec0b7] bg-stone-100/40 line-through opacity-40 cursor-not-allowed"
+                          )}
                         >
                           <span className="text-[11px] leading-none">{day}</span>
-                          {isAvailable && !isSelected && (
+                          {!isDisabled && !isSelected && isAvailable && (
                             <span className="w-1 h-1 rounded-full bg-[#4A7C59] mt-0.5"></span>
                           )}
                         </button>

@@ -16,13 +16,31 @@ import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { BookingRequest, ShootDurationType, UsageRightsTier } from '../types';
 import { INITIAL_BOOKINGS } from '../data/photographers';
-import { PHOTOGRAPHY_CATEGORIES } from '../data/categories';
+import { PHOTOGRAPHY_CATEGORIES, PhotographyCategory } from '../data/categories';
+import { fetchCategories } from '@/lib/supabase';
 
 export const PhotographersPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [categoriesList, setCategoriesList] = useState<PhotographyCategory[]>(PHOTOGRAPHY_CATEGORIES);
 
-  // Photographers data — load initial plus dynamically registered photographers
+  useEffect(() => {
+    fetchCategories().then(dbCats => {
+      if (dbCats && dbCats.length > 0) {
+        const mapped = dbCats.map(c => ({
+          id: c.id,
+          name: c.name,
+          shortName: c.short_name || c.name,
+          description: c.description || '',
+          image: c.image_url || '',
+          popularCount: c.popular_count || '0+ Shoots'
+        }));
+        setCategoriesList(mapped);
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Photographers data  -  load initial plus dynamically registered photographers
   const [photographers, setPhotographers] = useState<Photographer[]>(() => getAllPhotographers());
   const [isLoading, setIsLoading] = useState(false);
 
@@ -75,7 +93,7 @@ export const PhotographersPage: React.FC = () => {
     });
   };
 
-  // Filters — initialize from URL params
+  // Filters  -  initialize from URL params
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
   const [selectedExperience, setSelectedExperience] = useState<ExperienceLevelFilterType>('all');
@@ -163,7 +181,7 @@ export const PhotographersPage: React.FC = () => {
       all: photographers.length,
       'All Categories': photographers.length
     };
-    PHOTOGRAPHY_CATEGORIES.forEach(cat => {
+    categoriesList.forEach(cat => {
       if (cat.id === 'all') {
         counts[cat.id] = photographers.length;
         counts[cat.name] = photographers.length;

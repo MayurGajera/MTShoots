@@ -104,7 +104,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBookings(updated);
     setIsBookingModalOpen(false);
     setBookingConfig(null);
-    triggerToast('Booking confirmed! View your bookings â†’');
+    triggerToast('Booking confirmed! View your bookings');
     if (isSupabaseConfigured()) {
       saveBookingToSupabase(newBooking).catch(() => {});
     }
@@ -126,7 +126,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('mtshoots_city', city);
     } catch {}
     setShowLocationPicker(false);
-    triggerToast(`Showing photographers near ${city} ðŸ“ `);
+    triggerToast(`Showing photographers near ${city} ðŸ" `);
   };
 
   return (
@@ -158,10 +158,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useApp() {
+const defaultAppContext: AppContextType = {
+  bookings: [],
+  setBookings: () => {},
+  shortlistIds: [],
+  setShortlistIds: () => {},
+  onToggleSave: () => {},
+  selectedCity: 'All India',
+  setSelectedCity: () => {},
+  showLocationPicker: false,
+  setShowLocationPicker: () => {},
+  isBookingModalOpen: false,
+  setIsBookingModalOpen: () => {},
+  bookingConfig: null,
+  setBookingConfig: () => {},
+  openBooking: () => {},
+  openNewBooking: () => {},
+  toastMessage: null,
+  triggerToast: () => {},
+  handleConfirmBooking: () => {},
+  handleLocationSelect: () => {}
+};
+
+export function useApp(): AppContextType {
   const ctx = useContext(AppContext);
-  if (!ctx) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return ctx;
+  return ctx || defaultAppContext;
+}
+
+export function useSafeApp(): AppContextType | null {
+  return useContext(AppContext);
 }

@@ -1,8 +1,9 @@
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { X, Calendar, MapPin, Clock, User, Mail, FileText, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Photographer, BookingRequest, ShootDurationType, UsageRightsTier } from '../types';
 import { AVAILABLE_ADDONS } from '../data/photographers';
+import { fetchAddOns, DbAddOn } from '@/lib/supabase';
 import { formatINR } from '../utils/format';
 import { useScrollLock } from '../hooks/useScrollLock';
 
@@ -29,6 +30,21 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
 }) => {
   useScrollLock(true);
 
+  const [addOnsList, setAddOnsList] = useState(AVAILABLE_ADDONS);
+
+  useEffect(() => {
+    fetchAddOns().then(dbAddOns => {
+      if (dbAddOns && dbAddOns.length > 0) {
+        setAddOnsList(dbAddOns.map(a => ({
+          id: a.id,
+          name: a.name,
+          price: a.price,
+          description: a.description || ''
+        })));
+      }
+    }).catch(() => {});
+  }, []);
+
   const defaultPhotographer = initialConfig?.photographer || photographers[0];
 
   const [selectedPhotographerId, setSelectedPhotographerId] = useState<string>(
@@ -37,10 +53,10 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
   const currentPhotographer =
     photographers.find((p) => p.id === selectedPhotographerId) || defaultPhotographer;
 
-  const [artDirectorName, setArtDirectorName] = useState<string>('Rhea Singhania');
-  const [artDirectorEmail, setArtDirectorEmail] = useState<string>('r.singhania@vogue.in');
+  const [artDirectorName, setArtDirectorName] = useState<string>('');
+  const [artDirectorEmail, setArtDirectorEmail] = useState<string>('');
   const [shootDate, setShootDate] = useState<string>(initialConfig?.selectedDate || '2026-09-30');
-  const [callTime, setCallTime] = useState<string>('06:00 AM IST (First Light)');
+  const [callTime, setCallTime] = useState<string>('');
   const [selectedLocation, setSelectedLocation] = useState<string>(
     initialConfig?.shootLocation || currentPhotographer.officeLocation || currentPhotographer.location
   );
@@ -54,14 +70,13 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
     initialConfig?.usageRights || 'commercial-standard'
   );
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>(
-    initialConfig?.selectedAddOns || ['digitech-assistant', 'medium-format']
+    initialConfig?.selectedAddOns || []
   );
-  const [notes, setNotes] = useState<string>(
-    'Wardrobe and styling details arrive before sunrise. Please keep a clean working path for camera equipment and make sure the assistant is ready for live preview during the key frames.'
-  );
+  const [notes, setNotes] = useState<string>('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [cancellationAccepted, setCancellationAccepted] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const locationOptions = useMemo(() => {
     const opts = [
@@ -86,7 +101,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
   const usageCost = Math.round(currentPhotographer.dayRate * usageMultiplier);
 
   const addOnsCost = selectedAddOns.reduce((sum, id) => {
-    const item = AVAILABLE_ADDONS.find((a) => a.id === id);
+    const item = addOnsList.find((a) => a.id === id);
     return sum + (item ? item.price : 0);
   }, 0);
 
@@ -99,8 +114,30 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
     if (matched) setLocationAddress(matched.address);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+    if (!artDirectorName.trim() || artDirectorName.trim().length < 2) {
+      errors.name = 'Please enter your name (minimum 2 characters)';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!artDirectorEmail.trim() || !emailRegex.test(artDirectorEmail.trim())) {
+      errors.email = 'Please enter a valid email address';
+    }
+    if (!shootDate) {
+      errors.date = 'Please select a shoot date';
+    }
+    if (!callTime.trim()) {
+      errors.time = 'Please enter call time (e.g. 09:00 AM)';
+    }
+    if (!termsAccepted || !privacyAccepted || !cancellationAccepted) {
+      errors.terms = 'Please accept all policy terms to proceed';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
 
     if (!termsAccepted || !privacyAccepted || !cancellationAccepted) {
       return;
@@ -177,7 +214,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
             >
               {photographers.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} — {formatINR(p.dayRate)}/day ({p.location})
+                  {p.name}  -  {formatINR(p.dayRate)}/day ({p.location})
                 </option>
               ))}
             </select>
@@ -194,8 +231,9 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
                   type="text"
                   required
                   value={artDirectorName}
-                  onChange={(e) => setArtDirectorName(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E7E1DA] text-sm text-[#181615] focus:outline-none focus:border-[#C85A32]"
+                  onChange={(e) => { setArtDirectorName(e.target.value); if (formErrors.name) setFormErrors(prev => ({ ...prev, name: '' })); }}
+                  placeholder="e.g. Priya Sharma"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E7E1DA] text-sm text-[#181615] placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-[#C85A32]"
                 />
               </div>
             </div>
@@ -210,8 +248,9 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
                   type="email"
                   required
                   value={artDirectorEmail}
-                  onChange={(e) => setArtDirectorEmail(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E7E1DA] text-sm text-[#181615] focus:outline-none focus:border-[#C85A32]"
+                  onChange={(e) => { setArtDirectorEmail(e.target.value); if (formErrors.email) setFormErrors(prev => ({ ...prev, email: '' })); }}
+                  placeholder="e.g. priya.sharma@example.com"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E7E1DA] text-sm text-[#181615] placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-[#C85A32]"
                 />
               </div>
             </div>
@@ -227,6 +266,11 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
                 <input
                   type="date"
                   required
+                  min={(() => {
+                    const d = new Date();
+                    d.setMonth(d.getMonth() - 6);
+                    return d.toISOString().split('T')[0];
+                  })()}
                   value={shootDate}
                   onChange={(e) => setShootDate(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E7E1DA] text-sm text-[#181615] focus:outline-none focus:border-[#C85A32]"
@@ -244,9 +288,9 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
                   type="text"
                   required
                   value={callTime}
-                  onChange={(e) => setCallTime(e.target.value)}
+                  onChange={(e) => { setCallTime(e.target.value); if (formErrors.time) setFormErrors(prev => ({ ...prev, time: '' })); }}
                   placeholder="e.g. 07:00 AM IST"
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E7E1DA] text-sm text-[#181615] focus:outline-none focus:border-[#C85A32]"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E7E1DA] text-sm text-[#181615] placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-[#C85A32]"
                 />
               </div>
             </div>

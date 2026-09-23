@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   MapPin,
@@ -13,7 +13,8 @@ import {
   Users,
   RotateCcw
 } from 'lucide-react';
-import { PHOTOGRAPHY_CATEGORIES } from '../data/categories';
+import { PHOTOGRAPHY_CATEGORIES, PhotographyCategory } from '../data/categories';
+import { fetchCategories } from '@/lib/supabase';
 
 export type BudgetRangeType = 'all' | 'under-50k' | '50k-100k' | '100k-150k' | 'above-150k';
 export type ExperienceLevelFilterType = 'all' | 'beginner' | 'professional' | 'master';
@@ -72,6 +73,23 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   totalCount,
   onResetFilters
 }) => {
+  const [categoriesList, setCategoriesList] = useState<PhotographyCategory[]>(PHOTOGRAPHY_CATEGORIES);
+
+  useEffect(() => {
+    fetchCategories().then(dbCats => {
+      if (dbCats && dbCats.length > 0) {
+        const mapped = dbCats.map(c => ({
+          id: c.id,
+          name: c.name,
+          shortName: c.short_name || c.name,
+          description: c.description || '',
+          image: c.image_url || '',
+          popularCount: c.popular_count || '0+ Shoots'
+        }));
+        setCategoriesList(mapped);
+      }
+    }).catch(() => {});
+  }, []);
   // Compute active filters
   const activeFilters = [
     searchQuery.trim() !== '',
@@ -127,7 +145,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 id="category-wise-select"
                 value={(() => {
                   if (!selectedCategory || selectedCategory === 'all' || selectedCategory === 'All Categories') return 'all';
-                  const found = PHOTOGRAPHY_CATEGORIES.find(c =>
+                  const found = categoriesList.find(c =>
                     c.name.toLowerCase() === selectedCategory.toLowerCase() ||
                     c.id.toLowerCase() === selectedCategory.toLowerCase() ||
                     c.shortName.toLowerCase() === selectedCategory.toLowerCase()
@@ -138,7 +156,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 className="w-full bg-transparent focus:outline-none cursor-pointer text-xs font-medium text-[#181615] truncate"
               >
                 <option value="all">Category: All Categories ({totalCount})</option>
-                {PHOTOGRAPHY_CATEGORIES.filter((c) => c.id !== 'all').map((cat) => (
+                {categoriesList.filter((c) => c.id !== 'all').map((cat) => (
                   <option key={cat.id} value={cat.name}>
                     {cat.name}
                   </option>
@@ -163,8 +181,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 className="w-full bg-transparent focus:outline-none cursor-pointer text-xs font-medium text-[#181615] truncate"
               >
                 <option value="all">Level: All Experience Levels</option>
-                <option value="beginner">Beginner / Emerging (1–3 yrs)</option>
-                <option value="professional">Professional Pro (4–7 yrs)</option>
+                <option value="beginner">Beginner / Emerging (1 - 3 yrs)</option>
+                <option value="professional">Professional Pro (4 - 7 yrs)</option>
                 <option value="master">Master Artist (8+ yrs)</option>
               </select>
             </div>
@@ -189,8 +207,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             >
               <option value="all">Any Price</option>
               <option value="under-50k">Under ₹50,000 / day</option>
-              <option value="50k-100k">₹50,000 – ₹1,00,000</option>
-              <option value="100k-150k">₹1,00,000 – ₹1,50,000</option>
+              <option value="50k-100k">₹50,000  -  ₹1,00,000</option>
+              <option value="100k-150k">₹1,00,000  -  ₹1,50,000</option>
               <option value="above-150k">Above ₹1,50,000 / day</option>
             </select>
           </div>

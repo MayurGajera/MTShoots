@@ -8,7 +8,7 @@ import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { ScrollToTopButton } from '@/components/ScrollToTopButton';
 import { LocationPickerModal } from '@/components/LocationPickerModal';
 import { BookingSheetModal } from '@/components/BookingSheetModal';
-import { INITIAL_PHOTOGRAPHERS } from '@/data/photographers';
+import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '@/data/photographers';
 import { ApertureLoader } from '@/components/ApertureLoader';
 
 function InnerShell({ children }: { children: React.ReactNode }) {
@@ -29,6 +29,12 @@ function InnerShell({ children }: { children: React.ReactNode }) {
   } = useApp();
 
   const [isAppLoading, setIsAppLoading] = useState(true);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }, []);
+
 
   useEffect(() => {
     const handleOpenLoc = () => setShowLocationPicker(true);
@@ -88,7 +94,7 @@ function InnerShell({ children }: { children: React.ReactNode }) {
       {isBookingModalOpen && (
         <BookingSheetModal
           initialConfig={bookingConfig}
-          photographers={INITIAL_PHOTOGRAPHERS}
+          photographers={getAllPhotographers()}
           onClose={() => {
             setIsBookingModalOpen(false);
             setBookingConfig(null);

@@ -10,19 +10,26 @@ import {
   MapPin,
   ChevronDown,
   Smartphone,
+  Download,
   User,
   Settings,
   KeyRound,
   LogOut,
   Upload,
   Check,
-  ShieldCheck
+  ShieldCheck,
+  CheckCircle2,
+  Trash2,
+  Laptop,
+  Globe
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/lib/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { MTShootsLogo } from './MTShootsLogo';
+import { AvatarPicker } from './AvatarPicker';
+import { getUserByEmail, upsertUser, savePhotographerToSupabase, getUserAddresses, addUserAddress, deleteUserAddress, getUserDevices, deactivateDevice, DbUserAddress, DbUserDevice } from '@/lib/supabase';
 
 interface NavbarProps {
   currentTab?: 'roster' | 'callsheets' | 'shortlist';
@@ -43,13 +50,6 @@ interface UserProfile {
   phone?: string;
 }
 
-const PRESET_USER_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80'
-];
-
 export const Navbar: React.FC<NavbarProps> = ({
   bookingCount = 0,
   shortlistCount = 0,
@@ -64,6 +64,39 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   // Modals for settings and change password
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'addresses' | 'devices'>('profile');
+  const [userAddresses, setUserAddresses] = useState<DbUserAddress[]>([]);
+  const [userDevices, setUserDevices] = useState<DbUserDevice[]>([]);
+  const [showAddAddress, setShowAddAddress] = useState(false);
+  const [newAddrLabel, setNewAddrLabel] = useState('Home');
+  const [newAddrStreet, setNewAddrStreet] = useState('');
+  const [newAddrCity, setNewAddrCity] = useState('');
+  const [newAddrState, setNewAddrState] = useState('');
+  const [newAddrPincode, setNewAddrPincode] = useState('');
+  const [newAddrIsDefault, setNewAddrIsDefault] = useState(false);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+
+  const loadUserAccountData = async (targetEmail: string) => {
+    try {
+      let dbUser = await getUserByEmail(targetEmail);
+      if (!dbUser && user) {
+        dbUser = await upsertUser({
+          email: targetEmail,
+          full_name: user.fullName || 'User',
+          city: user.city,
+          avatar_url: user.avatar
+        });
+      }
+      if (dbUser?.id) {
+        const [addrs, devs] = await Promise.all([
+          getUserAddresses(dbUser.id),
+          getUserDevices(dbUser.id)
+        ]);
+        setUserAddresses(addrs);
+        setUserDevices(devs);
+      }
+    } catch {}
+  };
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   // Settings form states
@@ -71,6 +104,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [settingsPhone, setSettingsPhone] = useState('');
   const [settingsCity, setSettingsCity] = useState('');
   const [settingsAvatar, setSettingsAvatar] = useState('');
+
+  // Photographer specific settings states
+  const [settingsBrandName, setSettingsBrandName] = useState('');
+  const [settingsGenre, setSettingsGenre] = useState('Wedding');
+  const [settingsBio, setSettingsBio] = useState('');
+  const [settingsStartingRate, setSettingsStartingRate] = useState<number>(40000);
+  const [settingsCameraBodies, setSettingsCameraBodies] = useState('');
+  const [settingsLenses, setSettingsLenses] = useState('');
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState('');
@@ -141,27 +182,149 @@ export const Navbar: React.FC<NavbarProps> = ({
       setSettingsName(user.fullName || '');
       setSettingsPhone(user.phone || '');
       setSettingsCity(user.city || currentCity);
-      setSettingsAvatar(user.avatar || PRESET_USER_AVATARS[0]);
+      setSettingsAvatar(user.avatar || '');
+      if (user.role === 'photographer') {
+        try {
+          const storedProfile = localStorage.getItem('mtshoots_photographer_profile');
+          if (storedProfile) {
+            const p = JSON.parse(storedProfile);
+            setSettingsBrandName(p.brandName || p.name || user.fullName || '');
+            setSettingsGenre(p.primaryDiscipline || p.discipline || p.genre || 'Wedding');
+            setSettingsBio(p.bio || '');
+            setSettingsStartingRate(Number(p.startingDayRate || p.startingRate || 40000));
+            setSettingsCameraBodies(Array.isArray(p.equipment?.cameraBodies) ? p.equipment.cameraBodies.join(', ') : (p.gear || ''));
+            setSettingsLenses(Array.isArray(p.equipment?.lenses) ? p.equipment.lenses.join(', ') : '');
+          }
+        } catch {}
+      }
+      if (user.email) {
+        loadUserAccountData(user.email);
+      }
     }
+    setSettingsTab('profile');
+    setShowAddAddress(false);
     setIsSettingsOpen(true);
     setUserDropdownOpen(false);
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleAddAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.email || !newAddrCity.trim()) return;
+    setIsSavingAddress(true);
+    try {
+      let dbUser = await getUserByEmail(user.email);
+      if (!dbUser) {
+        dbUser = await upsertUser({
+          email: user.email,
+          full_name: user.fullName || 'User',
+          city: user.city,
+          avatar_url: user.avatar
+        });
+      }
+      if (dbUser?.id) {
+        await addUserAddress({
+          user_id: dbUser.id,
+          label: newAddrLabel,
+          street: newAddrStreet,
+          city: newAddrCity,
+          state: newAddrState,
+          pincode: newAddrPincode,
+          landmark: null,
+          is_default: newAddrIsDefault,
+        });
+        const updatedAddrs = await getUserAddresses(dbUser.id);
+        setUserAddresses(updatedAddrs);
+        setShowAddAddress(false);
+        setNewAddrStreet('');
+        setNewAddrCity('');
+        setNewAddrState('');
+        setNewAddrPincode('');
+        triggerToast('Address saved to profile!');
+      }
+    } catch {} finally {
+      setIsSavingAddress(false);
+    }
+  };
+
+  const handleDeleteAddress = async (addrId: string) => {
+    await deleteUserAddress(addrId);
+    setUserAddresses(prev => prev.filter(a => a.id !== addrId));
+    triggerToast('Address removed');
+  };
+
+  const handleRevokeDevice = async (devId: string) => {
+    await deactivateDevice(devId);
+    setUserDevices(prev => prev.filter(d => d.id !== devId));
+    triggerToast('Device access revoked');
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    const trimmedName = settingsName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      triggerToast('Full name must be at least 2 characters');
+      return;
+    }
     const updated: UserProfile = {
       ...user,
-      fullName: settingsName,
-      phone: settingsPhone,
-      city: settingsCity,
-      avatar: settingsAvatar
+      fullName: trimmedName,
+      phone: settingsPhone.trim(),
+      city: settingsCity.trim() || currentCity,
+      avatar: settingsAvatar || ''
     };
     setUser(updated);
     localStorage.setItem('mtshoots_user', JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('mtshoots-auth-changed'));
+
+    try {
+      await upsertUser({
+        email: user.email,
+        full_name: trimmedName,
+        phone: settingsPhone.trim(),
+        city: settingsCity.trim() || currentCity,
+        avatar_url: settingsAvatar || '',
+        role: user.role || 'customer'
+      });
+    } catch (err) {
+      console.warn('Could not sync user profile update to Supabase:', err);
+    }
+
+    if (user.role === 'photographer') {
+      try {
+        let existingProfile: any = {};
+        const storedProfile = localStorage.getItem('mtshoots_photographer_profile');
+        if (storedProfile) {
+          existingProfile = JSON.parse(storedProfile);
+        }
+        const updatedPhotographer = {
+          ...existingProfile,
+          name: trimmedName,
+          brandName: settingsBrandName.trim() || trimmedName,
+          phone: settingsPhone.trim(),
+          city: settingsCity.trim() || currentCity,
+          avatar: settingsAvatar || '',
+          primaryDiscipline: settingsGenre,
+          startingDayRate: Number(settingsStartingRate) || 40000,
+          bio: settingsBio.trim(),
+          gear: settingsCameraBodies.trim(),
+          equipment: {
+            cameraBodies: settingsCameraBodies.split(',').map(s => s.trim()).filter(Boolean),
+            lenses: settingsLenses.split(',').map(s => s.trim()).filter(Boolean)
+          }
+        };
+        localStorage.setItem('mtshoots_photographer_profile', JSON.stringify(updatedPhotographer));
+        window.dispatchEvent(new CustomEvent('photographers-updated'));
+        try {
+          await savePhotographerToSupabase(updatedPhotographer);
+        } catch {}
+      } catch (err) {
+        console.warn('Could not sync photographer profile update:', err);
+      }
+    }
+
     setIsSettingsOpen(false);
-    triggerToast('Account details updated successfully!');
+    triggerToast('Account profile updated in database successfully!');
   };
 
   const handleOpenPasswordModal = () => {
@@ -228,9 +391,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         : 'text-[#57423b] hover:text-[#181615] hover:bg-[#F4EFEB]'
     }`;
 
-  const userAvatarImage = user?.avatar || PRESET_USER_AVATARS[0];
+  const hasUserAvatar = Boolean(user?.avatar && user.avatar.trim());
 
   return (
+  <>
     <header className="sticky top-0 z-40 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#E7E1DA] transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-18 gap-3">
@@ -282,17 +446,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </Link>
             </nav>
 
-            {/* Install App CTA */}
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))}
-              className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#E7E1DA] hover:border-[#C85A32] text-xs font-semibold text-[#57423b] hover:text-[#C85A32] hover:bg-[#F4EFEB] transition-all cursor-pointer"
-              title="Install MTShoots as an App"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-[#C85A32]" />
-              <span>Install App</span>
-            </button>
-
             {/* Book a Shoot CTA */}
             {onOpenNewBooking && (
               <Button
@@ -320,11 +473,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full border border-[#E7E1DA] hover:border-[#C85A32]/50 bg-white hover:bg-[#FAF8F5] transition-all cursor-pointer shadow-xs"
                 >
                   <div className="relative">
-                    <img
-                      src={userAvatarImage}
-                      alt={user.fullName}
-                      className="w-7 h-7 rounded-full object-cover ring-2 ring-[#C85A32]/30"
-                    />
+                    {hasUserAvatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.fullName}
+                        className="w-7 h-7 rounded-full object-cover ring-2 ring-[#C85A32]/30"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-[#FAF8F5] border border-[#E7E1DA] flex items-center justify-center text-[#C85A32] ring-2 ring-[#C85A32]/20">
+                        <User className="w-3.5 h-3.5" />
+                      </div>
+                    )}
                     <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-[#2D593E] ring-1 ring-white" />
                   </div>
                   <span className="text-xs font-bold text-[#181615] truncate max-w-[90px]">
@@ -346,18 +505,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                       {/* User Header */}
                       <div className="p-3 bg-[#FAF8F5] rounded-xl mb-1 border border-[#E7E1DA]/60">
                         <div className="flex items-center gap-2.5">
-                          <img
-                            src={userAvatarImage}
-                            alt={user.fullName}
-                            className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-xs"
-                          />
+                          {hasUserAvatar ? (
+                            <img
+                              src={user.avatar}
+                              alt={user.fullName}
+                              className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-xs"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-white border border-[#E7E1DA] flex items-center justify-center text-[#C85A32] shadow-xs">
+                              <User className="w-5 h-5" />
+                            </div>
+                          )}
                           <div className="truncate">
                             <div className="text-xs font-bold text-[#181615] truncate">{user.fullName}</div>
                             <div className="text-[11px] text-[#8a726a] truncate">{user.email}</div>
                           </div>
                         </div>
                         <div className="mt-2 flex items-center justify-between text-[10px] text-[#2D593E] font-bold bg-[#EAF4ED] px-2 py-0.5 rounded-full">
-                          <span>âœ“ Verified Client</span>
+                          <span>âœ" Verified Client</span>
                           <span>{user.city || currentCity}</span>
                         </div>
                       </div>
@@ -404,16 +569,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="hidden md:flex items-center gap-1.5">
+              <div className="hidden md:flex items-center gap-1.5 shrink-0">
                 <Link
                   to="/photographers/apply"
-                  className="text-xs font-semibold text-[#57423b] px-3 py-1.5 rounded-full border border-[#E7E1DA] hover:border-[#dec0b7] hover:bg-[#F4EFEB] transition-all cursor-pointer whitespace-nowrap"
+                  className="text-xs font-semibold text-[#57423b] px-3.5 h-8 rounded-full border border-[#E7E1DA] hover:border-[#dec0b7] hover:bg-[#F4EFEB] transition-all cursor-pointer flex items-center justify-center shrink-0 whitespace-nowrap"
                 >
                   Join as Photographer
                 </Link>
                 <Link
                   to="/auth"
-                  className="text-xs font-bold text-white bg-[#181615] px-4 py-1.5 rounded-full hover:bg-[#C85A32] transition-all cursor-pointer shadow-sm whitespace-nowrap"
+                  className="text-xs font-bold text-white bg-[#181615] px-4 h-8 rounded-full hover:bg-[#C85A32] transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 whitespace-nowrap"
                 >
                   Sign In
                 </Link>
@@ -444,7 +609,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               {user && (
                 <div className="p-3 bg-[#FAF8F5] rounded-xl mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <img src={userAvatarImage} alt={user.fullName} className="w-8 h-8 rounded-full object-cover" />
+                    {hasUserAvatar ? (
+                      <img src={user.avatar} alt={user.fullName} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-white border border-[#E7E1DA] flex items-center justify-center text-[#C85A32]">
+                        <User className="w-4 h-4" />
+                      </div>
+                    )}
                     <div>
                       <div className="text-xs font-bold text-[#181615]">{user.fullName}</div>
                       <div className="text-[10px] text-[#8a726a]">{user.email}</div>
@@ -454,50 +625,72 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
 
-              <Link
-                to="/photographers"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-xs font-semibold text-[#181615] hover:bg-[#FAF8F5]"
-              >
-                Photographers Directory
-              </Link>
-              <Link
-                to="/bookings"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-xs font-semibold text-[#181615] hover:bg-[#FAF8F5]"
-              >
-                Bookings {bookingCount > 0 && `(${bookingCount})`}
-              </Link>
-              <Link
-                to="/saved"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-xs font-semibold text-[#181615] hover:bg-[#FAF8F5]"
-              >
-                Saved Photographers {shortlistCount > 0 && `(${shortlistCount})`}
-              </Link>
-              <Link
-                to="/photographers/apply"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-xs font-bold text-[#C85A32] hover:bg-[#FAF8F5]"
-              >
-                Join as Photographer
-              </Link>
+              {/* Centered navigation items with icons */}
+              <div className="flex flex-col items-center gap-1.5 py-1.5">
+                <Link
+                  to="/photographers"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                >
+                  <Camera className="w-4 h-4 text-[#C85A32]" />
+                  <span>Photographers Directory</span>
+                </Link>
+
+                <Link
+                  to="/bookings"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                >
+                  <Calendar className="w-4 h-4 text-[#C85A32]" />
+                  <span>Bookings</span>
+                  {bookingCount > 0 && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-[#FAF8F5] text-[11px] font-bold text-[#C85A32] border border-[#E7E1DA]">
+                      {bookingCount}
+                    </span>
+                  )}
+                </Link>
+
+                <Link
+                  to="/saved"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                >
+                  <Heart className="w-4 h-4 text-[#C85A32]" />
+                  <span>Saved Photographers</span>
+                  {shortlistCount > 0 && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-[#FAF8F5] text-[11px] font-bold text-[#C85A32] border border-[#E7E1DA]">
+                      {shortlistCount}
+                    </span>
+                  )}
+                </Link>
+
+                <Link
+                  to="/photographers/apply"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-[#C85A32] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                >
+                  <Plus className="w-4 h-4 text-[#C85A32]" />
+                  <span>Join as Photographer</span>
+                </Link>
+              </div>
 
               <div className="pt-2 border-t border-[#E7E1DA]">
                 {user ? (
                   <button
                     onClick={handleSignOut}
-                    className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 cursor-pointer transition-colors"
                   >
-                    Sign Out
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
                   </button>
                 ) : (
                   <Link
                     to="/auth"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block text-center px-4 py-2 rounded-xl bg-[#181615] text-white font-bold text-xs"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#181615] text-white font-bold text-xs shadow-md hover:bg-black transition-all active:scale-[0.98]"
                   >
-                    Sign In to Account
+                    <User className="w-4 h-4" />
+                    <span>Sign In to Account</span>
                   </Link>
                 )}
               </div>
@@ -506,11 +699,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* Account Settings Modal */}
+    </header>
+
+    {/* Account Settings Modal */}
       {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-[#E7E1DA]">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E1DA]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] my-auto flex flex-col p-5 sm:p-6 space-y-4 shadow-2xl border border-[#E7E1DA] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#E7E1DA] shrink-0">
               <div className="flex items-center gap-2">
                 <Settings className="w-4 h-4 text-[#C85A32]" />
                 <h3 className="font-serif text-lg font-bold text-[#181615]">Account Settings</h3>
@@ -523,84 +719,359 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveSettings} className="space-y-4">
-              {/* Avatar Picker */}
-              <div className="text-center space-y-2">
-                <img
-                  src={settingsAvatar || PRESET_USER_AVATARS[0]}
-                  alt="Avatar Preview"
-                  className="w-16 h-16 rounded-full object-cover mx-auto ring-4 ring-[#C85A32]/20"
+            {/* Tabs Header */}
+            <div className="flex items-center gap-1.5 p-1 bg-[#F4EFEB] rounded-xl shrink-0">
+              <button
+                type="button"
+                onClick={() => setSettingsTab('profile')}
+                className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ' + (settingsTab === 'profile' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
+              >
+                Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsTab('addresses')}
+                className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ' + (settingsTab === 'addresses' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
+              >
+                Addresses
+                <span className="px-1.5 py-0.2 bg-[#C85A32]/10 text-[#C85A32] rounded-full text-[10px]">{userAddresses.length}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsTab('devices')}
+                className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ' + (settingsTab === 'devices' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
+              >
+                Devices
+                <span className="px-1.5 py-0.2 bg-[#C85A32]/10 text-[#C85A32] rounded-full text-[10px]">{userDevices.length}</span>
+              </button>
+            </div>
+
+            {/* Tab 1: Profile */}
+            {settingsTab === 'profile' && (
+              <form onSubmit={handleSaveSettings} className="space-y-4 overflow-y-auto pr-1 flex-1">
+                {/* Avatar & Photo Picker */}
+                <AvatarPicker
+                  value={settingsAvatar}
+                  onChange={setSettingsAvatar}
+                  label='Profile Photo (Optional)'
+                  helperText='Upload your custom photo or leave empty for default profile icon'
                 />
-                <div className="text-[11px] text-[#8a726a]">Choose profile avatar:</div>
-                <div className="flex items-center justify-center gap-2">
-                  {PRESET_USER_AVATARS.map((av, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setSettingsAvatar(av)}
-                      className={`w-8 h-8 rounded-full overflow-hidden border-2 transition-all cursor-pointer ${
-                        settingsAvatar === av ? 'border-[#C85A32] scale-110' : 'border-transparent opacity-70'
-                      }`}
-                    >
-                      <img src={av} alt="Preset" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Full Legal Name</label>
+                    <Input
+                      value={settingsName}
+                      onChange={(e) => setSettingsName(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
+                      required
+                    />
+                  </div>
+
+                  {user?.role === 'photographer' && (
+                    <div>
+                      <label className="block text-xs font-bold text-[#181615] mb-1">Brand / Studio Name</label>
+                      <Input
+                        value={settingsBrandName}
+                        onChange={(e) => setSettingsBrandName(e.target.value)}
+                        placeholder="e.g. Lumina Studio Arts"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Phone Number</label>
+                    <Input
+                      value={settingsPhone}
+                      onChange={(e) => setSettingsPhone(e.target.value)}
+                      placeholder="e.g. +91 98765 43210"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Base City</label>
+                    <Input
+                      value={settingsCity}
+                      onChange={(e) => setSettingsCity(e.target.value)}
+                      placeholder="e.g. Mumbai, Maharashtra"
+                    />
+                  </div>
+                </div>
+
+                {user?.role === 'photographer' && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Primary Discipline</label>
+                        <select
+                          value={settingsGenre}
+                          onChange={(e) => setSettingsGenre(e.target.value)}
+                          className="w-full h-9 rounded-xl border border-[#E7E1DA] bg-white px-3 py-1 text-xs text-[#181615] focus:outline-none focus:ring-2 focus:ring-[#C85A32]"
+                        >
+                          <option value="Wedding">Wedding Photography</option>
+                          <option value="Pre-Wedding">Pre-Wedding & Couple Portraits</option>
+                          <option value="Fashion">Fashion & Lookbook Editorial</option>
+                          <option value="Commercial">Commercial & Advertising</option>
+                          <option value="Product">Product & E-Commerce</option>
+                          <option value="Architecture">Architecture & Interior</option>
+                          <option value="Portrait">Corporate & Portraiture</option>
+                          <option value="Food">Food & Beverage</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Starting Day Rate (₹ INR)</label>
+                        <Input
+                          type="number"
+                          min="5000"
+                          step="1000"
+                          value={settingsStartingRate}
+                          onChange={(e) => setSettingsStartingRate(Number(e.target.value))}
+                          placeholder="e.g. 40000"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#181615] mb-1">Professional Bio</label>
+                      <textarea
+                        value={settingsBio}
+                        onChange={(e) => setSettingsBio(e.target.value)}
+                        rows={3}
+                        placeholder="Describe your photography journey, creative vision, and client experience..."
+                        className="w-full rounded-xl border border-[#E7E1DA] bg-white p-3 text-xs text-[#181615] focus:outline-none focus:ring-2 focus:ring-[#C85A32] leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Camera Bodies & Gear</label>
+                        <Input
+                          value={settingsCameraBodies}
+                          onChange={(e) => setSettingsCameraBodies(e.target.value)}
+                          placeholder="e.g. Sony A7 IV, Canon EOS R5"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Prime & Zoom Lenses</label>
+                        <Input
+                          value={settingsLenses}
+                          onChange={(e) => setSettingsLenses(e.target.value)}
+                          placeholder="e.g. 24-70mm f/2.8, 85mm f/1.4"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-[#E7E1DA]">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="text-xs font-semibold"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs"
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {/* Tab 2: Addresses (Multi-Address) */}
+            {settingsTab === 'addresses' && (
+              <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-[#181615]">Saved Shoot & Billing Addresses</div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAddAddress(!showAddAddress)}
+                    className="text-[11px] h-7 px-2.5 flex items-center gap-1 text-[#C85A32] border-[#C85A32]/30 hover:bg-[#C85A32]/5"
+                  >
+                    <Plus className="w-3 h-3" />
+                    {showAddAddress ? 'Cancel' : 'Add Address'}
+                  </Button>
+                </div>
+
+                {/* Add Address Form */}
+                {showAddAddress && (
+                  <form onSubmit={handleAddAddress} className="p-3.5 bg-[#FAF8F5] rounded-2xl border border-[#E7E1DA] space-y-2.5 animate-in fade-in duration-150">
+                    <div className="text-xs font-bold text-[#181615]">Add New Address</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#8a726a] mb-0.5">Label</label>
+                        <select
+                          value={newAddrLabel}
+                          onChange={(e) => setNewAddrLabel(e.target.value)}
+                          className="w-full text-xs p-2 rounded-xl border border-[#E7E1DA] bg-white focus:outline-none focus:border-[#C85A32]"
+                        >
+                          <option value="Home">Home</option>
+                          <option value="Office">Office</option>
+                          <option value="Studio">Studio</option>
+                          <option value="Shoot Location">Shoot Location</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#8a726a] mb-0.5">City *</label>
+                        <Input
+                          value={newAddrCity}
+                          onChange={(e) => setNewAddrCity(e.target.value)}
+                          placeholder="e.g. Mumbai"
+                          className="text-xs h-8"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-[#8a726a] mb-0.5">Street / Building</label>
+                      <Input
+                        value={newAddrStreet}
+                        onChange={(e) => setNewAddrStreet(e.target.value)}
+                        placeholder="Flat, building, street, area"
+                        className="text-xs h-8"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#8a726a] mb-0.5">State</label>
+                        <Input
+                          value={newAddrState}
+                          onChange={(e) => setNewAddrState(e.target.value)}
+                          placeholder="e.g. Maharashtra"
+                          className="text-xs h-8"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#8a726a] mb-0.5">PIN Code</label>
+                        <Input
+                          value={newAddrPincode}
+                          onChange={(e) => setNewAddrPincode(e.target.value)}
+                          placeholder="400050"
+                          className="text-xs h-8"
+                        />
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer pt-1">
+                      <input
+                        type="checkbox"
+                        checked={newAddrIsDefault}
+                        onChange={(e) => setNewAddrIsDefault(e.target.checked)}
+                        className="rounded accent-[#C85A32]"
+                      />
+                      <span className="text-xs text-[#57423b]">Set as default address</span>
+                    </label>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <Button
+                        type="submit"
+                        disabled={isSavingAddress}
+                        className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs h-8 px-4"
+                      >
+                        {isSavingAddress ? 'Saving...' : 'Save Address'}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Addresses List */}
+                <div className="space-y-2">
+                  {userAddresses.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-[#8a726a] bg-[#FAF8F5] rounded-2xl border border-dashed border-[#E7E1DA]">
+                      No addresses saved yet. Click "Add Address" to add your shoot or studio location.
+                    </div>
+                  ) : (
+                    userAddresses.map((addr) => (
+                      <div key={addr.id} className="p-3 bg-[#FAF8F5] rounded-2xl border border-[#E7E1DA] flex items-start justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-[#181615]">{addr.label}</span>
+                            {addr.is_default && (
+                              <span className="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-700 rounded-md">Default</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-[#57423b]">
+                            {[addr.street, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ')}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAddress(addr.id)}
+                          className="p-1 rounded-lg text-[#8a726a] hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Delete address"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
+            )}
 
-              <div>
-                <label className="block text-xs font-bold text-[#181615] mb-1">Full Name</label>
-                <Input
-                  value={settingsName}
-                  onChange={(e) => setSettingsName(e.target.value)}
-                  placeholder="Your Name"
-                  required
-                />
-              </div>
+            {/* Tab 3: Devices (Multi-Device Access) */}
+            {settingsTab === 'devices' && (
+              <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+                <div className="text-xs text-[#8a726a]">
+                  These devices and sessions currently have active access to your MTShoots account.
+                </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#181615] mb-1">Phone Number</label>
-                <Input
-                  value={settingsPhone}
-                  onChange={(e) => setSettingsPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
-                />
+                <div className="space-y-2">
+                  {userDevices.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-[#8a726a] bg-[#FAF8F5] rounded-2xl border border-dashed border-[#E7E1DA]">
+                      No other devices logged in. This current session is active.
+                    </div>
+                  ) : (
+                    userDevices.map((dev) => {
+                      const isMobile = dev.device_type === 'ios' || dev.device_type === 'android';
+                      const isDesktop = dev.device_type === 'desktop';
+                      return (
+                        <div key={dev.id} className="p-3 bg-[#FAF8F5] rounded-2xl border border-[#E7E1DA] flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-white border border-[#E7E1DA] flex items-center justify-center shrink-0 text-[#C85A32]">
+                              {isMobile ? <Smartphone className="w-4 h-4" /> : isDesktop ? <Laptop className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-[#181615]">{dev.device_name}</span>
+                                <span className="px-1.5 py-0.2 uppercase text-[9px] font-bold bg-[#E7E1DA] text-[#57423b] rounded">
+                                  {dev.device_type || 'web'}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-[#8a726a] flex items-center gap-1.5 mt-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span>Active session</span>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeDevice(dev.id)}
+                            className="text-[11px] font-bold text-red-600 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#181615] mb-1">City</label>
-                <Input
-                  value={settingsCity}
-                  onChange={(e) => setSettingsCity(e.target.value)}
-                  placeholder="e.g. Mumbai"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#E7E1DA]">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="text-xs font-semibold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs"
-                >
-                  Save Changes
-                </Button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}
 
       {/* Change Password Modal */}
       {isPasswordModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-[#E7E1DA]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] my-auto overflow-y-auto p-6 space-y-4 shadow-2xl border border-[#E7E1DA]">
             <div className="flex items-center justify-between pb-3 border-b border-[#E7E1DA]">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-[#C85A32]" />
@@ -635,9 +1106,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                    required
-                  />
+                    placeholder="Enter password" />
                 </div>
 
                 <div>
@@ -646,9 +1115,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                    required
-                  />
+                    placeholder="Enter password" />
                 </div>
 
                 <div>
@@ -657,9 +1124,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                    required
-                  />
+                    placeholder="Enter password" />
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-[#E7E1DA]">
@@ -687,10 +1152,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#181615] text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl border border-white/10 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <span>âœ“</span>
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
-    </header>
+      </>
   );
 };

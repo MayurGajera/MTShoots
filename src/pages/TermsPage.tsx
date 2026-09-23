@@ -57,7 +57,7 @@ export const TermsPage: React.FC = () => {
             <ul className="list-disc pl-5 space-y-2">
               <li>The photographer retains foundational moral and intellectual copyright under the Indian Copyright Act, 1957.</li>
               <li>The client is granted an exclusive or standard commercial license according to the selected Usage Rights tier (Editorial, Commercial Standard, Global, or Buyout).</li>
-              <li>Final edited files are delivered via MTShoots cloud storage within the agreed turnaround window (typically 3–5 business days).</li>
+              <li>Final edited files are delivered via MTShoots cloud storage within the agreed turnaround window (typically 3 - 5 business days).</li>
             </ul>
           </section>
 

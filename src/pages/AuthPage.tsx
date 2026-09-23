@@ -15,22 +15,18 @@ import {
   Upload,
   RefreshCw,
   KeyRound,
-  ArrowRight
+  ArrowRight,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MTShootsLogo } from '../components/MTShootsLogo';
 import { ButtonSpinner } from '../components/ApertureLoader';
+import { AvatarPicker } from '../components/AvatarPicker';
+import { PhotographerWizard } from '../components/PhotographerWizard';
+import { upsertUser, getUserByEmail } from '../lib/supabase';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 type UserRole = 'customer' | 'photographer';
-
-const PRESET_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80'
-];
 
 export const AuthPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -39,6 +35,8 @@ export const AuthPage: React.FC = () => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [role, setRole] = useState<UserRole>('customer');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -48,8 +46,8 @@ export const AuthPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [city, setCity] = useState('Mumbai');
-  const [avatarUrl, setAvatarUrl] = useState(PRESET_AVATARS[0]);
+  const [city, setCity] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
 
   // Forgot Password / OTP Flow States
   const [otpStage, setOtpStage] = useState<'email' | 'otp' | 'newPassword' | 'done'>('email');
@@ -111,27 +109,69 @@ export const AuthPage: React.FC = () => {
     e.preventDefault();
     setError(null);
 
-    if (mode === 'signup' && password !== confirmPassword) {
-      setError('Passwords do not match.');
+    const errs: Record<string, string> = {};
+    if (mode === 'signup') {
+      if (!fullName.trim() || fullName.trim().length < 2) {
+        errs.fullName = 'Please enter your full name (minimum 2 characters).';
+      }
+      if (password !== confirmPassword) {
+        errs.confirmPassword = 'Passwords do not match.';
+      }
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      errs.email = 'Please enter a valid email address (e.g. you@example.com).';
+    }
+
+    if (!password || password.length < 6) {
+      errs.password = 'Password must be at least 6 characters long.';
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
+    setValidationErrors({});
 
     setIsLoading(true);
 
     try {
-      await new Promise(r => setTimeout(r, 600));
+      let finalName = fullName.trim();
+      let finalCity = city.trim() || 'Mumbai';
+      let finalAvatar = avatarUrl || '';
+      let finalRole = role;
+      let userId = 'usr-' + Date.now();
+
+      if (mode === 'signup') {
+        const dbUser = await upsertUser({
+          email: email.trim().toLowerCase(),
+          full_name: finalName,
+          city: finalCity,
+          avatar_url: finalAvatar,
+          role: finalRole
+        });
+        if (dbUser?.id) userId = dbUser.id;
+      } else {
+        const dbUser = await getUserByEmail(email.trim().toLowerCase());
+        if (dbUser) {
+          userId = dbUser.id || userId;
+          finalName = dbUser.full_name || finalName || email.split('@')[0].replace(/[._]/g, ' ');
+          finalCity = dbUser.city || finalCity;
+          finalAvatar = dbUser.avatar_url || finalAvatar;
+          finalRole = dbUser.role || finalRole;
+        } else {
+          finalName = email.split('@')[0].replace(/[._]/g, ' ') || 'User';
+        }
+      }
 
       const userObject = {
-        id: 'usr-' + Date.now(),
-        fullName: mode === 'signup' ? fullName : (email.split('@')[0].replace(/[._]/g, ' ') || 'Mayur Gajera'),
-        email,
-        role,
-        city: mode === 'signup' ? city : 'Mumbai',
-        avatar: avatarUrl
+        id: userId,
+        fullName: finalName,
+        email: email.trim().toLowerCase(),
+        role: finalRole,
+        city: finalCity,
+        avatar: finalAvatar
       };
 
       localStorage.setItem('mtshoots_user', JSON.stringify(userObject));
@@ -241,10 +281,10 @@ export const AuthPage: React.FC = () => {
       </div>
 
       {/* Main Container */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="max-w-md w-full">
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <div className="w-full max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl transition-all">
           {/* Card */}
-          <div className="bg-white rounded-3xl border border-[#E7E1DA] p-6 sm:p-8 shadow-sm">
+          <div className="bg-white rounded-3xl border border-[#E7E1DA] p-6 sm:p-10 lg:p-12 shadow-sm">
             {/* If in Forgot Password Mode */}
             {mode === 'forgot' ? (
               <div>
@@ -366,10 +406,7 @@ export const AuthPage: React.FC = () => {
                         type="password"
                         value={resetPassword}
                         onChange={(e) => setResetPassword(e.target.value)}
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
-                      />
+                        placeholder="Enter password" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-[#181615] mb-1.5">Confirm New Password</label>
@@ -377,10 +414,7 @@ export const AuthPage: React.FC = () => {
                         type="password"
                         value={resetConfirmPassword}
                         onChange={(e) => setResetConfirmPassword(e.target.value)}
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
-                      />
+                        placeholder="Enter password" />
                     </div>
                     <button
                       type="submit"
@@ -443,27 +477,43 @@ export const AuthPage: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Photographer Callout Banner */}
-                {role === 'photographer' && (
-                  <div className="mb-6 p-4 rounded-2xl bg-[#FFF6F2] border border-[#F4C5B5] text-[#9F3C16] text-xs space-y-2">
-                    <div className="font-bold flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-[#C85A32]" />
-                      <span>5-Step Photographer Onboarding</span>
-                    </div>
-                    <p className="text-[11px] text-[#8a726a] leading-relaxed">
-                      Showcase multiple portfolio photos, camera gear specs, and custom rate cards on our dedicated artist application portal.
-                    </p>
-                    <Link
-                      to="/photographers/apply"
-                      className="inline-flex items-center gap-1.5 font-bold text-xs text-[#C85A32] hover:underline"
-                    >
-                      <span>Open 5-Step Artist Onboarding Wizard</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                )}
+                {role === 'photographer' && mode === 'signup' ? (
+                  <div className="w-full">
+                    {/* Title & Tabs */}
+                    <div className="text-center mb-6">
+                      <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#181615]">
+                        Create Artist Account
+                      </h1>
+                      <p className="text-xs text-[#8a726a] mt-1">
+                        Showcase your portfolio to top commercial & event clients
+                      </p>
 
-                {/* Title & Tabs */}
+                      <div className="flex justify-center gap-6 mt-4 border-b border-[#E7E1DA]">
+                        <button
+                          type="button"
+                          onClick={() => { setMode('login'); setError(null); }}
+                          className="pb-2.5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer border-b-2 -mb-px border-transparent text-[#8a726a] hover:text-[#181615]"
+                        >
+                          Sign In
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setMode('signup'); setError(null); }}
+                          className="pb-2.5 text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer border-b-2 -mb-px border-[#C85A32] text-[#C85A32]"
+                        >
+                          Create Account
+                        </button>
+                      </div>
+                    </div>
+
+                    <PhotographerWizard
+                      hideHeader={true}
+                      onSwitchToLogin={() => setMode('login')}
+                    />
+                  </div>
+                ) : (
+                  <div>
+{/* Title & Tabs */}
                 <div className="text-center mb-6">
                   <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#181615]">
                     {role === 'photographer'
@@ -508,123 +558,152 @@ export const AuthPage: React.FC = () => {
                   </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className='space-y-4'>
                   {mode === 'signup' && (
                     <>
-                      {/* Avatar Picker for Signup */}
-                      <div className="p-3 bg-[#FAF8F5] rounded-2xl border border-[#E7E1DA] text-center space-y-2">
-                        <img
-                          src={avatarUrl}
-                          alt="Avatar"
-                          className="w-14 h-14 rounded-full object-cover mx-auto ring-2 ring-[#C85A32]/30"
-                        />
-                        <div className="text-[10px] text-[#8a726a]">Select profile picture avatar:</div>
-                        <div className="flex justify-center gap-1.5">
-                          {PRESET_AVATARS.map((av, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => setAvatarUrl(av)}
-                              className={`w-7 h-7 rounded-full overflow-hidden border-2 transition-all cursor-pointer ${
-                                avatarUrl === av ? 'border-[#C85A32] scale-110' : 'border-transparent opacity-60'
-                              }`}
-                            >
-                              <img src={av} alt="Avatar option" className="w-full h-full object-cover" />
-                            </button>
-                          ))}
+                      <AvatarPicker
+                        value={avatarUrl}
+                        onChange={setAvatarUrl}
+                        label={role === 'photographer' ? 'Artist Profile Picture' : 'Profile Photo'}
+                        helperText='Upload your photo or leave blank for default avatar'
+                        optional={true}
+                      />
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className='block text-xs font-bold text-[#181615] mb-1.5'>
+                            Full Name *
+                          </label>
+                          <input
+                            type='text'
+                            value={fullName}
+                            onChange={(e) => {
+                              setFullName(e.target.value);
+                              if (validationErrors.fullName) setValidationErrors(prev => ({ ...prev, fullName: '' }));
+                            }}
+                            placeholder='e.g. Rahul Sharma'
+                            className={'w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs placeholder:text-stone-400 placeholder:font-normal focus:outline-none transition-colors ' + (validationErrors.fullName ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
+                          />
+                          {validationErrors.fullName && (
+                            <p className='text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1'>
+                              <AlertCircle className='w-3 h-3 shrink-0' />
+                              <span>{validationErrors.fullName}</span>
+                            </p>
+                          )}
                         </div>
-                      </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-[#181615] mb-1.5">
-                          Full Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          placeholder="e.g. Mayur Gajera"
-                          required
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#181615] mb-1.5">
-                          City
-                        </label>
-                        <input
-                          type="text"
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
-                          placeholder="e.g. Mumbai, Surat, Bengaluru"
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
-                        />
+                        <div>
+                          <label className='block text-xs font-bold text-[#181615] mb-1.5'>
+                            City
+                          </label>
+                          <input
+                            type='text'
+                            value={city}
+                            onChange={(e) => setCity(e.target.value)}
+                            placeholder='e.g. Mumbai, Delhi, Bengaluru'
+                            className='w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-[#C85A32]'
+                          />
+                        </div>
                       </div>
                     </>
                   )}
 
                   <div>
-                    <label className="block text-xs font-bold text-[#181615] mb-1.5">
+                    <label className='block text-xs font-bold text-[#181615] mb-1.5'>
                       Email Address *
                     </label>
                     <input
-                      type="email"
+                      type='email'
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      required
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (validationErrors.email) setValidationErrors(prev => ({ ...prev, email: '' }));
+                      }}
+                      placeholder='e.g. rahul.sharma@example.com'
+                      className={'w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs focus:outline-none transition-colors ' + (validationErrors.email ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
                     />
+                    {validationErrors.email && (
+                      <p className='text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1'>
+                        <AlertCircle className='w-3 h-3 shrink-0' />
+                        <span>{validationErrors.email}</span>
+                      </p>
+                    )}
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs font-bold text-[#181615]">
+                    <div className='flex items-center justify-between mb-1.5'>
+                      <label className='block text-xs font-bold text-[#181615]'>
                         Password *
                       </label>
                       {mode === 'login' && (
                         <button
-                          type="button"
-                          onClick={() => { setMode('forgot'); setError(null); }}
-                          className="text-[11px] text-[#C85A32] hover:underline cursor-pointer font-semibold"
+                          type='button'
+                          onClick={() => { setMode('forgot'); setError(null); setValidationErrors({}); }}
+                          className='text-[11px] text-[#C85A32] hover:underline cursor-pointer font-semibold'
                         >
                           Forgot password?
                         </button>
                       )}
                     </div>
-                    <div className="relative">
+                    <div className='relative'>
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (validationErrors.password) setValidationErrors(prev => ({ ...prev, password: '' }));
+                        }}
+                        placeholder='Enter password (min 6 characters)'
+                        className={'w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs focus:outline-none transition-colors pr-10 ' + (validationErrors.password ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
                       />
                       <button
-                        type="button"
+                        type='button'
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a726a] hover:text-[#181615] cursor-pointer"
+                        className='absolute right-3 top-1/2 -translate-y-1/2 text-[#8a726a] hover:text-[#181615] cursor-pointer p-1'
+                        tabIndex={-1}
                       >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showPassword ? <EyeOff className='w-4 h-4' /> : <Eye className='w-4 h-4' />}
                       </button>
                     </div>
+                    {validationErrors.password && (
+                      <p className='text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1'>
+                        <AlertCircle className='w-3 h-3 shrink-0' />
+                        <span>{validationErrors.password}</span>
+                      </p>
+                    )}
                   </div>
 
                   {mode === 'signup' && (
                     <div>
-                      <label className="block text-xs font-bold text-[#181615] mb-1.5">
+                      <label className='block text-xs font-bold text-[#181615] mb-1.5'>
                         Confirm Password *
                       </label>
-                      <input
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
-                      />
+                      <div className='relative'>
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(e) => {
+                            setConfirmPassword(e.target.value);
+                            if (validationErrors.confirmPassword) setValidationErrors(prev => ({ ...prev, confirmPassword: '' }));
+                          }}
+                          placeholder='Re-enter password'
+                          className={'w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs focus:outline-none transition-colors pr-10 ' + (validationErrors.confirmPassword ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
+                        />
+                        <button
+                          type='button'
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className='absolute right-3 top-1/2 -translate-y-1/2 text-[#8a726a] hover:text-[#181615] cursor-pointer p-1'
+                          tabIndex={-1}
+                        >
+                          {showConfirmPassword ? <EyeOff className='w-4 h-4' /> : <Eye className='w-4 h-4' />}
+                        </button>
+                      </div>
+                      {validationErrors.confirmPassword && (
+                        <p className='text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1'>
+                          <AlertCircle className='w-3 h-3 shrink-0' />
+                          <span>{validationErrors.confirmPassword}</span>
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -640,6 +719,8 @@ export const AuthPage: React.FC = () => {
                     )}
                   </button>
                 </form>
+                  </div>
+                )}
               </div>
             )}
           </div>
