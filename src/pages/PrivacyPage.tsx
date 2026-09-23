@@ -1,20 +1,34 @@
 'use client';
 import React from 'react';
-import { Link } from '@/lib/navigation';
+import { Link, useNavigate } from '@/lib/navigation';
 import { Shield, Lock, Eye, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 
 export const PrivacyPage: React.FC = () => {
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col">
       <Navbar />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 flex-1 w-full space-y-10">
         <div className="space-y-4">
-          <Link to="/" className="inline-flex items-center gap-1.5 text-xs text-[#8a726a] hover:text-[#C85A32] transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Home
-          </Link>
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8a726a] hover:text-[#C85A32] transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Back
+          </button>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#EAF4ED] border border-[#2D593E]/20 text-[#2D593E] text-xs font-bold uppercase tracking-wider">
             <Shield className="w-3.5 h-3.5" /> Data Protection
           </div>

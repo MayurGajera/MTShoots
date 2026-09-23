@@ -4,6 +4,7 @@ import { Heart, Camera, ArrowLeft, X } from 'lucide-react';
 import { Link, useNavigate } from '@/lib/navigation';
 import { Photographer } from '../types';
 import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
+import { loadPhotographers } from '../lib/supabase';
 import { PhotographerCard } from '../components/PhotographerCard';
 import { PhotographerDetailModal } from '../components/PhotographerDetailModal';
 import { BookingSheetModal } from '../components/BookingSheetModal';
@@ -15,7 +16,13 @@ import { PortfolioItem, ShootDurationType, UsageRightsTier } from '../types';
 
 export const SavedPage: React.FC = () => {
   const navigate = useNavigate();
-  const allPhotographers = getAllPhotographers();
+  const [allPhotographers, setAllPhotographers] = useState<Photographer[]>(() => getAllPhotographers());
+
+  React.useEffect(() => {
+    loadPhotographers().then(remote => {
+      if (remote && remote.length > 0) setAllPhotographers(remote);
+    }).catch(() => {});
+  }, []);
 
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     try {

@@ -1,4 +1,4 @@
-﻿import type { Metadata } from 'next';
+import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import '@/index.css';
 import { ClientShell } from '@/components/ClientShell';
@@ -82,6 +82,18 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="MTShoots" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.__deferredPrompt = null;
+              window.addEventListener('beforeinstallprompt', function(e) {
+                e.preventDefault();
+                window.__deferredPrompt = e;
+                window.dispatchEvent(new CustomEvent('pwa-prompt-ready', { detail: e }));
+              });
+            `,
+          }}
+        />
       </head>
       <body className="font-sans antialiased bg-[#FAF8F5] text-[#181615] max-w-full overflow-x-clip" suppressHydrationWarning>
         <ClientShell>{children}</ClientShell>

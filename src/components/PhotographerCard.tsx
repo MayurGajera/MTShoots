@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Star, MapPin, Heart, ArrowRight, ShieldCheck, Clock, Sparkles, Award, Camera, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link, useNavigate } from '@/lib/navigation';
 import { motion } from 'motion/react';
@@ -14,6 +14,7 @@ interface PhotographerCardProps {
   isSaved: boolean;
   onToggleSave: (id: string) => void;
   onOpenLightboxImage?: (imgUrl: string, title: string) => void;
+  targetDate?: string;
 }
 
 export const PhotographerCard: React.FC<PhotographerCardProps> = ({
@@ -25,50 +26,73 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  // Build slider images from homeSliderPhotos + heroImage fallback
-  const sliderImages: string[] = (() => {
-    const photos = photographer.homeSliderPhotos && photographer.homeSliderPhotos.length > 0
-      ? photographer.homeSliderPhotos
-      : [photographer.heroImage];
+  // Build slider images from homeSliderPhotos, fallback to heroImage + portfolio items
+  const sliderImages: string[] = React.useMemo(() => {
+    const rawList: string[] = [];
+    if (photographer.homeSliderPhotos && photographer.homeSliderPhotos.length > 0) {
+      rawList.push(...photographer.homeSliderPhotos);
+    } else {
+      if (photographer.heroImage) rawList.push(photographer.heroImage);
+      if (photographer.portfolio && photographer.portfolio.length > 0) {
+        rawList.push(...photographer.portfolio.map(p => p.imageUrl));
+      }
+    }
     const seen = new Set<string>();
     const result: string[] = [];
-    for (const img of photos) {
-      if (img && !seen.has(img)) { seen.add(img); result.push(img); }
+    for (const img of rawList) {
+      if (img && !seen.has(img)) {
+        seen.add(img);
+        result.push(img);
+      }
     }
-    return result;
-  })();
+    return result.length > 0 ? result : [photographer.heroImage];
+  }, [photographer]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchDeltaX = useRef(0);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // Check if image is already cached/complete on render/index change
+  useEffect(() => {
+    if (imgRef.current && imgRef.current.complete) {
+      setImgLoaded(true);
+    }
+  }, [currentIndex, sliderImages]);
+
+  const hasMultipleImages = sliderImages.length > 1;
 
   const goNext = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!hasMultipleImages) return;
     setImgLoaded(false);
     setCurrentIndex(i => (i + 1) % sliderImages.length);
-  }, [sliderImages.length]);
+  }, [hasMultipleImages, sliderImages.length]);
 
   const goPrev = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!hasMultipleImages) return;
     setImgLoaded(false);
     setCurrentIndex(i => (i - 1 + sliderImages.length) % sliderImages.length);
-  }, [sliderImages.length]);
+  }, [hasMultipleImages, sliderImages.length]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (!hasMultipleImages) return;
     touchStartX.current = e.touches[0].clientX;
     touchDeltaX.current = 0;
     setIsDragging(false);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return;
+    if (!hasMultipleImages || touchStartX.current === null) return;
     touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
     if (Math.abs(touchDeltaX.current) > 10) setIsDragging(true);
   };
 
   const handleTouchEnd = () => {
+    if (!hasMultipleImages) return;
     if (Math.abs(touchDeltaX.current) > 50) {
       setImgLoaded(false);
       if (touchDeltaX.current < 0) {
@@ -84,7 +108,6 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
 
   const handleCardNavigate = () => {
     if (isDragging) return;
-    if (onSelect) onSelect(photographer);
     navigate(`/photographers/${photographer.id}`);
   };
 
@@ -100,7 +123,6 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
   };
 
   const expBadge = getExperienceBadge();
-  const hasMultipleImages = sliderImages.length > 1;
 
   return (
     <motion.article
@@ -125,13 +147,14 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
 
         {/* Current image */}
         {!imgLoaded && (
-          <div className="absolute inset-0 shimmer" />
+          <div className="absolute inset-0 shimmer pointer-events-none" />
         )}
         <img
+          ref={imgRef}
           key={sliderImages[currentIndex]}
           src={sliderImages[currentIndex]}
-          alt={`${photographer.name}  -  ${photographer.primaryCategory} photography`}
-          className={`relative z-10 w-full h-full object-cover object-top transition-all duration-700 group-hover:scale-105 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+          alt={`${photographer.name} — ${photographer.primaryCategory} photography`}
+          className={`relative z-10 w-full h-full object-cover object-top transition-transform duration-700 sm:group-hover:scale-105 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           loading="lazy"
           referrerPolicy="no-referrer"
           onLoad={() => setImgLoaded(true)}
@@ -140,15 +163,15 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
             setImgLoaded(true);
           }}
         />
-        <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/80 via-black/15 to-transparent opacity-85 group-hover:opacity-70 transition-opacity" />
+        <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-85 sm:group-hover:opacity-70 transition-opacity" />
 
-        {/* ── Slider Controls ── */}
+        {/* ── Slider Controls (Only visible when >1 image) ── */}
         {hasMultipleImages && (
           <>
             <button
               type="button"
               onClick={goPrev}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-black/75 cursor-pointer shadow-md"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-black/85 cursor-pointer shadow-md"
               aria-label="Previous photo"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -156,7 +179,7 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
             <button
               type="button"
               onClick={goNext}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-black/75 cursor-pointer shadow-md"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-black/85 cursor-pointer shadow-md"
               aria-label="Next photo"
             >
               <ChevronRight className="w-4 h-4" />

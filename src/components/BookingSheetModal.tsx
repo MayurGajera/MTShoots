@@ -1,5 +1,6 @@
 'use client';
 import React, { useMemo, useState, useEffect } from 'react';
+import { Link } from '@/lib/navigation';
 import { X, Calendar, MapPin, Clock, User, Mail, FileText, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Photographer, BookingRequest, ShootDurationType, UsageRightsTier } from '../types';
 import { AVAILABLE_ADDONS } from '../data/photographers';
@@ -55,7 +56,17 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
 
   const [artDirectorName, setArtDirectorName] = useState<string>('');
   const [artDirectorEmail, setArtDirectorEmail] = useState<string>('');
-  const [shootDate, setShootDate] = useState<string>(initialConfig?.selectedDate || '2026-09-30');
+  const [shootDate, setShootDate] = useState<string>(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const maxDate = new Date();
+    maxDate.setMonth(maxDate.getMonth() + 6);
+    const maxStr = maxDate.toISOString().split('T')[0];
+    const candidate = initialConfig?.selectedDate;
+    if (candidate && candidate >= todayStr && candidate <= maxStr) {
+      return candidate;
+    }
+    return todayStr;
+  });
   const [callTime, setCallTime] = useState<string>('');
   const [selectedLocation, setSelectedLocation] = useState<string>(
     initialConfig?.shootLocation || currentPhotographer.officeLocation || currentPhotographer.location
@@ -266,13 +277,27 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
                 <input
                   type="date"
                   required
-                  min={(() => {
+                  min={new Date().toISOString().split('T')[0]}
+                  max={(() => {
                     const d = new Date();
-                    d.setMonth(d.getMonth() - 6);
+                    d.setMonth(d.getMonth() + 6);
                     return d.toISOString().split('T')[0];
                   })()}
                   value={shootDate}
-                  onChange={(e) => setShootDate(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const maxDate = new Date();
+                    maxDate.setMonth(maxDate.getMonth() + 6);
+                    const maxStr = maxDate.toISOString().split('T')[0];
+                    if (val < todayStr) {
+                      setShootDate(todayStr);
+                    } else if (val > maxStr) {
+                      setShootDate(maxStr);
+                    } else {
+                      setShootDate(val);
+                    }
+                  }}
                   className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E7E1DA] text-sm text-[#181615] focus:outline-none focus:border-[#C85A32]"
                 />
               </div>
@@ -373,7 +398,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
                 className="mt-0.5 rounded text-[#C85A32] cursor-pointer"
               />
               <label className="leading-relaxed">
-                I agree to the <a href="/terms" target="_blank" rel="noreferrer" className="font-bold underline text-[#C85A32] hover:text-[#B24E2A]">Terms and Conditions</a> for photography booking and shoot execution.
+                I agree to the <Link to="/terms" className="font-bold underline text-[#C85A32] hover:text-[#B24E2A]">Terms and Conditions</Link> for photography booking and shoot execution.
               </label>
             </div>
             <div className="flex items-start gap-2.5 text-xs text-[#181615]">
@@ -384,7 +409,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
                 className="mt-0.5 rounded text-[#C85A32] cursor-pointer"
               />
               <label className="leading-relaxed">
-                I agree to the <a href="/privacy" target="_blank" rel="noreferrer" className="font-bold underline text-[#C85A32] hover:text-[#B24E2A]">Privacy Policy</a> and understand my contact details are used for booking coordination only.
+                I agree to the <Link to="/privacy" className="font-bold underline text-[#C85A32] hover:text-[#B24E2A]">Privacy Policy</Link> and understand my contact details are used for booking coordination only.
               </label>
             </div>
             <div className="flex items-start gap-2.5 text-xs text-[#181615]">
@@ -395,7 +420,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
                 className="mt-0.5 rounded text-[#C85A32] cursor-pointer"
               />
               <label className="leading-relaxed">
-                I accept the <a href="/cancellation" target="_blank" rel="noreferrer" className="font-bold underline text-[#C85A32] hover:text-[#B24E2A]">Cancellation &amp; Refund Slabs</a> including rescheduling policies.
+                I accept the <Link to="/cancellation" className="font-bold underline text-[#C85A32] hover:text-[#B24E2A]">Cancellation &amp; Refund Slabs</Link> including rescheduling policies.
               </label>
             </div>
           </div>

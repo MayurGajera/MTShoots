@@ -11,6 +11,7 @@ import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { MTShootsLogo } from '../components/MTShootsLogo';
 import { PhotographerCard } from '../components/PhotographerCard';
+import { Photographer } from '../types';
 import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
 import { loadPhotographers, isSupabaseConfigured } from '../lib/supabase';
 import { fetchCategories, fetchTestimonials } from '@/lib/supabase';
@@ -129,7 +130,7 @@ export const LandingPage: React.FC = () => {
           role: t.author_role || 'Photography Client',
           avatar: t.author_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
           rating: t.rating || 5,
-          shootType: t.shoot_type || 'Photography'
+          shootType: (t as any).shoot_type || 'Photography'
         })));
       }
     }).catch(() => {});
@@ -229,6 +230,27 @@ export const LandingPage: React.FC = () => {
   }, []);
 
   const featuredPhotographers = allPhotographersList.slice(0, 3);
+  const featuredScrollRef = useRef<HTMLDivElement>(null);
+  const [activeFeaturedIndex, setActiveFeaturedIndex] = useState(0);
+
+  const handleFeaturedScroll = () => {
+    const el = featuredScrollRef.current;
+    if (!el) return;
+    const cardWidth = el.firstElementChild ? (el.firstElementChild as HTMLElement).offsetWidth + 20 : el.clientWidth;
+    const index = Math.round(el.scrollLeft / cardWidth);
+    setActiveFeaturedIndex(Math.min(Math.max(0, index), featuredPhotographers.length - 1));
+  };
+
+  const scrollToFeaturedIndex = (idx: number) => {
+    const el = featuredScrollRef.current;
+    if (!el || !el.children[idx]) return;
+    const target = el.children[idx] as HTMLElement;
+    el.scrollTo({
+      left: target.offsetLeft - 16,
+      behavior: 'smooth'
+    });
+    setActiveFeaturedIndex(idx);
+  };
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col">
@@ -352,12 +374,26 @@ export const LandingPage: React.FC = () => {
                   <input
                     type="date"
                     value={searchDate}
-                    min={(() => {
+                    min={new Date().toISOString().split('T')[0]}
+                    max={(() => {
                       const d = new Date();
-                      d.setMonth(d.getMonth() - 6);
+                      d.setMonth(d.getMonth() + 6);
                       return d.toISOString().split('T')[0];
                     })()}
-                    onChange={e => setSearchDate(e.target.value)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      const maxDate = new Date();
+                      maxDate.setMonth(maxDate.getMonth() + 6);
+                      const maxStr = maxDate.toISOString().split('T')[0];
+                      if (val < todayStr) {
+                        setSearchDate(todayStr);
+                      } else if (val > maxStr) {
+                        setSearchDate(maxStr);
+                      } else {
+                        setSearchDate(val);
+                      }
+                    }}
                     className="w-full bg-transparent text-xs font-bold text-[#181615] focus:outline-none cursor-pointer"
                   />
                 </div>
@@ -460,19 +496,46 @@ export const LandingPage: React.FC = () => {
           </Link>
         </div>
 
-        {/* Animated Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+        {/* Responsive Cards: Swipeable Carousel on Mobile, Grid on Tablet/Desktop */}
+        <div
+          ref={featuredScrollRef}
+          onScroll={handleFeaturedScroll}
+          className="flex overflow-x-auto snap-x snap-mandatory gap-5 pb-4 pt-1 px-4 -mx-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-8 md:overflow-visible no-scrollbar"
+        >
           {featuredPhotographers.map(p => (
-            <PhotographerCard
+            <div
               key={p.id}
-              photographer={p}
-              onSelect={() => navigate(`/photographers/${p.id}`)}
-              onQuickBook={() => navigate(`/photographers/${p.id}`)}
-              isSaved={shortlistIds.includes(p.id)}
-              onToggleSave={handleToggleShortlist}
-            />
+              className="w-[85vw] max-w-[340px] shrink-0 snap-center md:w-auto md:max-w-none md:shrink md:snap-none flex flex-col"
+            >
+              <PhotographerCard
+                photographer={p}
+                onSelect={() => navigate(`/photographers/${p.id}`)}
+                onQuickBook={() => navigate(`/photographers/${p.id}`)}
+                isSaved={shortlistIds.includes(p.id)}
+                onToggleSave={handleToggleShortlist}
+              />
+            </div>
           ))}
         </div>
+
+        {/* Mobile Carousel Indicators (Only when multiple cards exist) */}
+        {featuredPhotographers.length > 1 && (
+          <div className="flex md:hidden items-center justify-center gap-2 mt-2">
+            {featuredPhotographers.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => scrollToFeaturedIndex(idx)}
+                aria-label={`Go to photographer ${idx + 1}`}
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                  activeFeaturedIndex === idx
+                    ? 'w-6 bg-[#C85A32]'
+                    : 'w-2 bg-[#E7E1DA]'
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ============================================================ */}
@@ -677,7 +740,7 @@ export const LandingPage: React.FC = () => {
                         ))}
                       </div>
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#FAF8F5] text-[#8a726a] border border-[#E7E1DA]">
-                        {t.shootType || 'Verified Client'}
+                        {(t as any).shootType || 'Verified Client'}
                       </span>
                     </div>
 

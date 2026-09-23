@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { BookingRequest, Photographer, ShootDurationType, UsageRightsTier } from '@/types';
 import { INITIAL_BOOKINGS, INITIAL_PHOTOGRAPHERS } from '@/data/photographers';
-import { isSupabaseConfigured, saveBookingToSupabase } from '@/lib/supabase';
+import { isSupabaseConfigured, saveBookingToSupabase, fetchBookings } from '@/lib/supabase';
 
 export interface BookingConfig {
   photographer: Photographer;
@@ -41,14 +41,32 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [bookings, setBookings] = useState<BookingRequest[]>(() => {
-    if (typeof window === 'undefined') return INITIAL_BOOKINGS;
+    if (typeof window === 'undefined') return INITIAL_BOOKINGS || [];
     try {
       const saved = localStorage.getItem('capturely_bookings');
-      return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
+      return saved ? JSON.parse(saved) : (INITIAL_BOOKINGS || []);
     } catch {
-      return INITIAL_BOOKINGS;
+      return INITIAL_BOOKINGS || [];
     }
   });
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadDbBookings() {
+      try {
+        const remote = await fetchBookings();
+        if (isMounted && remote && remote.length > 0) {
+          setBookings(remote);
+        }
+      } catch (err) {
+        console.warn('Could not load remote bookings from Supabase:', err);
+      }
+    }
+    loadDbBookings();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') return ['darshan-mehta', 'rohan-varma'];
@@ -70,9 +88,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [showLocationPicker, setShowLocationPicker] = useState(false);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [bookingConfig, setBookingConfig] = useState<BookingConfig | null>(null);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return sessionStorage.getItem('mtshoots_booking_modal_open') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [bookingConfig, setBookingConfig] = useState<BookingConfig | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = sessionStorage.getItem('mtshoots_active_booking_config');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      if (bookingConfig) {
+        sessionStorage.setItem('mtshoots_active_booking_config', JSON.stringify(bookingConfig));
+      } else {
+        sessionStorage.removeItem('mtshoots_active_booking_config');
+      }
+    } catch {}
+  }, [bookingConfig]);
+
+  useEffect(() => {
+    try {
+      if (isBookingModalOpen) {
+        sessionStorage.setItem('mtshoots_booking_modal_open', 'true');
+      } else {
+        sessionStorage.removeItem('mtshoots_booking_modal_open');
+      }
+    } catch {}
+  }, [isBookingModalOpen]);
 
   useEffect(() => {
     try {
@@ -96,7 +151,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ? shortlistIds.filter(x => x !== id)
       : [...shortlistIds, id];
     setShortlistIds(next);
-    triggerToast(next.includes(id) ? 'Saved to shortlist â™¥' : 'Removed from shortlist');
+    triggerToast(next.includes(id) ? 'Saved to shortlist' : 'Removed from shortlist');
   };
 
   const handleConfirmBooking = (newBooking: BookingRequest) => {

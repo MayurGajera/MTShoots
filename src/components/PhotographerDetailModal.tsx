@@ -43,7 +43,11 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
   onToggleSave,
   onOpenLightbox
 }) => {
-  const [selectedDate, setSelectedDate] = useState<string>('2026-09-29');
+  const today = useMemo(() => new Date(), []);
+
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
   const [durationType, setDurationType] = useState<ShootDurationType>('full-day');
   const [usageRights] = useState<UsageRightsTier>('commercial-standard');
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>(['medium-format']);
@@ -87,19 +91,16 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
     }
   ];
 
-  // Calendar multi-month state with 6-month past window
-  const today = useMemo(() => new Date(), []);
-
+  // Calendar dates: past dates disabled, dates beyond 6 months disabled
   const minAllowedDate = useMemo(() => {
     const d = new Date(today);
-    d.setMonth(d.getMonth() - 6);
     d.setHours(0, 0, 0, 0);
     return d;
   }, [today]);
 
   const maxAllowedDate = useMemo(() => {
     const d = new Date(today);
-    d.setMonth(d.getMonth() + 18);
+    d.setMonth(d.getMonth() + 6);
     d.setHours(23, 59, 59, 999);
     return d;
   }, [today]);
@@ -117,6 +118,11 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
     return lastDayOfPrevMonth.getTime() < minAllowedDate.getTime();
   }, [calendarYear, calendarMonth, minAllowedDate]);
 
+  const isNextMonthDisabled = useMemo(() => {
+    const firstDayOfNextMonth = new Date(calendarYear, calendarMonth + 1, 1);
+    return firstDayOfNextMonth.getTime() > maxAllowedDate.getTime();
+  }, [calendarYear, calendarMonth, maxAllowedDate]);
+
   const handlePrevMonth = () => {
     if (isPrevMonthDisabled) return;
     if (calendarMonth === 0) {
@@ -128,6 +134,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
   };
 
   const handleNextMonth = () => {
+    if (isNextMonthDisabled) return;
     if (calendarMonth === 11) {
       setCalendarYear(y => y + 1);
       setCalendarMonth(0);

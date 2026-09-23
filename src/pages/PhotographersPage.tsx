@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link, useNavigate } from '@/lib/navigation';
-import { Search, ArrowLeft, Calendar as CalendarIcon, X } from 'lucide-react';
+import { Search, ArrowLeft, Calendar as CalendarIcon, X, Camera, ShieldCheck } from 'lucide-react';
 import { Photographer, PortfolioItem } from '../types';
 import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
 import { isSupabaseConfigured, loadPhotographers } from '../lib/supabase';
@@ -40,17 +40,41 @@ export const PhotographersPage: React.FC = () => {
     }).catch(() => {});
   }, []);
 
-  // Photographers data  -  load initial plus dynamically registered photographers
+  // Photographers data - load dynamic photographers from Supabase DB with fallback
   const [photographers, setPhotographers] = useState<Photographer[]>(() => getAllPhotographers());
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(() => getAllPhotographers().length === 0);
+
+  // Load photographers from Supabase DB
+  useEffect(() => {
+    let isMounted = true;
+    async function load() {
+      if (getAllPhotographers().length === 0) {
+        setIsLoading(true);
+      }
+      try {
+        const remote = await loadPhotographers();
+        if (isMounted && remote && remote.length > 0) {
+          setPhotographers(remote);
+        }
+      } catch (err) {
+        console.warn('Error loading photographers from Supabase:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Bookings state
   const [bookings, setBookings] = useState<BookingRequest[]>(() => {
     try {
       if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_bookings');
-      return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
-    } catch { return INITIAL_BOOKINGS; }
+      return saved ? JSON.parse(saved) : (INITIAL_BOOKINGS || []);
+    } catch { return INITIAL_BOOKINGS || []; }
   });
 
   // Shortlist
@@ -87,13 +111,13 @@ export const PhotographersPage: React.FC = () => {
     if (primary === needle || primary.includes(needle) || needle.includes(primary)) {
       return true;
     }
-    return p.specialties.some(s => {
+    return (p.specialties || []).some(s => {
       const sLower = s.toLowerCase();
       return sLower === needle || sLower.includes(needle) || needle.includes(sLower);
     });
   };
 
-  // Filters  -  initialize from URL params
+  // Filters - initialize from URL params
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
   const [selectedExperience, setSelectedExperience] = useState<ExperienceLevelFilterType>('all');
@@ -132,23 +156,6 @@ export const PhotographersPage: React.FC = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Load photographers from Supabase if configured
-  useEffect(() => {
-    async function load() {
-      if (isSupabaseConfigured()) {
-        try {
-          const remote = await loadPhotographers();
-          if (remote && remote.length > 0) {
-            setPhotographers([...getAllPhotographers().filter(p => !remote.some(r => r.id === p.id)), ...remote]);
-          }
-        } catch {
-          // Fallback to local
-        }
-      }
-    }
-    load();
-  }, []);
-
   // Persist bookings
   useEffect(() => {
     try { localStorage.setItem('capturely_bookings', JSON.stringify(bookings)); } catch {}
@@ -174,31 +181,31 @@ export const PhotographersPage: React.FC = () => {
     navigate('/photographers', { replace: true });
   };
 
-  const cities = useMemo(() => Array.from(new Set(photographers.map(p => p.baseCity).filter(Boolean))).sort(), [photographers]);
+  const cities = useMemo(() => Array.from(new Set((photographers || []).map(p => p.baseCity).filter(Boolean))).sort(), [photographers]);
 
   const photographerCountsByCategory = useMemo(() => {
     const counts: Record<string, number> = {
-      all: photographers.length,
-      'All Categories': photographers.length
+      all: (photographers || []).length,
+      'All Categories': (photographers || []).length
     };
     categoriesList.forEach(cat => {
       if (cat.id === 'all') {
-        counts[cat.id] = photographers.length;
-        counts[cat.name] = photographers.length;
+        counts[cat.id] = (photographers || []).length;
+        counts[cat.name] = (photographers || []).length;
       } else {
-        const matching = photographers.filter(p => isPhotographerInCategory(p, cat.name) || isPhotographerInCategory(p, cat.id)).length;
+        const matching = (photographers || []).filter(p => isPhotographerInCategory(p, cat.name) || isPhotographerInCategory(p, cat.id)).length;
         counts[cat.id] = matching;
         counts[cat.name] = matching;
       }
     });
     return counts;
-  }, [photographers]);
+  }, [photographers, categoriesList]);
 
   const filteredPhotographers = useMemo(() => {
-    return photographers.filter(p => {
+    return (photographers || []).filter(p => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        if (![p.name, p.location, p.baseCity, p.primaryCategory, ...p.specialties, p.experienceLevel, p.bio, p.cameraFormat, ...p.equipment, ...p.clientRoster].some(v => v?.toLowerCase().includes(q))) return false;
+        if (![p.name, p.location, p.baseCity, p.primaryCategory, ...(p.specialties || []), p.experienceLevel, p.bio, p.cameraFormat, ...(p.equipment || []), ...(p.clientRoster || [])].some(v => v?.toLowerCase().includes(q))) return false;
       }
       if (selectedCategory !== 'all' && selectedCategory !== 'All Categories') {
         if (!isPhotographerInCategory(p, selectedCategory)) return false;
@@ -211,24 +218,27 @@ export const PhotographersPage: React.FC = () => {
         const cityInLoc = cityLower.includes((p.baseCity || '').toLowerCase());
         if (!matchesBase && !matchesLoc && !cityInLoc) return false;
       }
-      if (targetDate && p.blackoutDates && p.blackoutDates.includes(targetDate)) {
+      if (targetDate && (p as any).blackoutDates && (p as any).blackoutDates.includes(targetDate)) {
         return false;
       }
-      if (budgetRange === 'under-50k' && p.dayRate >= 50000) return false;
-      if (budgetRange === '50k-100k' && (p.dayRate < 50000 || p.dayRate > 100000)) return false;
-      if (budgetRange === '100k-150k' && (p.dayRate < 100000 || p.dayRate > 150000)) return false;
-      if (budgetRange === 'above-150k' && p.dayRate <= 150000) return false;
+      const dayRate = p.dayRate || 0;
+      if (budgetRange === 'under-50k' && dayRate >= 50000) return false;
+      if (budgetRange === '50k-100k' && (dayRate < 50000 || dayRate > 100000)) return false;
+      if (budgetRange === '100k-150k' && (dayRate < 100000 || dayRate > 150000)) return false;
+      if (budgetRange === 'above-150k' && dayRate <= 150000) return false;
       if (onlyAvailableNow && !p.availableNow) return false;
-      if (onlyTopRated && p.rating < 4.95) return false;
-      if (onlyFastDelivery && p.turnaroundDays > 3) return false;
+      if (onlyTopRated && (p.rating || 0) < 4.95) return false;
+      if (onlyFastDelivery && (p.turnaroundDays || 3) > 3) return false;
       if (onlyAssistantIncluded && !p.assistantIncluded) return false;
       return true;
     }).sort((a, b) => {
-      if (sortBy === 'rate-asc') return a.dayRate - b.dayRate;
-      if (sortBy === 'rate-desc') return b.dayRate - a.dayRate;
-      if (sortBy === 'experience') return b.experienceYears - a.experienceYears;
-      if (sortBy === 'rating') return b.rating - a.rating;
-      if (sortBy === 'turnaround') return a.turnaroundDays - b.turnaroundDays;
+      const aRate = a.dayRate || 0;
+      const bRate = b.dayRate || 0;
+      if (sortBy === 'rate-asc') return aRate - bRate;
+      if (sortBy === 'rate-desc') return bRate - aRate;
+      if (sortBy === 'experience') return (b.experienceYears || 0) - (a.experienceYears || 0);
+      if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
+      if (sortBy === 'turnaround') return (a.turnaroundDays || 0) - (b.turnaroundDays || 0);
       return 0;
     });
   }, [photographers, searchQuery, selectedCategory, selectedExperience, selectedCity, targetDate, budgetRange, onlyAvailableNow, onlyTopRated, onlyFastDelivery, onlyAssistantIncluded, sortBy]);
@@ -250,7 +260,7 @@ export const PhotographersPage: React.FC = () => {
       durationType: 'full-day',
       usageRights: 'commercial-standard',
       selectedAddOns: [],
-      totalCost: p.dayRate + 5000,
+      totalCost: (p.dayRate || 25000) + 5000,
       shootLocation: p.officeLocation || p.location
     });
     setIsBookingModalOpen(true);
@@ -269,7 +279,7 @@ export const PhotographersPage: React.FC = () => {
     triggerToast('Booking confirmed! Check your bookings.');
   };
 
-  const allPortfolioItems = useMemo(() => photographers.flatMap(p => p.portfolio), [photographers]);
+  const allPortfolioItems = useMemo(() => (photographers || []).flatMap(p => p.portfolio || []), [photographers]);
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col pb-24 md:pb-0">
@@ -281,7 +291,7 @@ export const PhotographersPage: React.FC = () => {
         onOpenNewBooking={() => { setBookingConfig(null); setIsBookingModalOpen(true); }}
       />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 min-w-0 overflow-x-hidden">
         <div className="relative py-6 sm:py-8 border-b border-[#E7E1DA] mb-6 page-enter">
           <div className="flex items-center gap-3 mb-3">
             <Link to="/" className="flex items-center gap-1 text-xs text-[#8a726a] hover:text-[#C85A32] transition-colors cursor-pointer">
@@ -290,7 +300,7 @@ export const PhotographersPage: React.FC = () => {
           </div>
           <div className="max-w-3xl space-y-3">
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-[#fbf2ee] border border-[#dec0b7] text-[11px] font-bold tracking-widest uppercase text-[#9f3c16]">
-              <span>📸</span>
+              <Camera className="w-3.5 h-3.5 text-[#C85A32] shrink-0" />
               <span>MTShoots • Verified Professional Photographers</span>
             </div>
             <h1 className="font-serif text-3xl sm:text-5xl font-bold tracking-tight text-[#181615] leading-[1.15]">
@@ -417,24 +427,20 @@ export const PhotographersPage: React.FC = () => {
       {selectedPhotographer && (
         <PhotographerDetailModal
           photographer={selectedPhotographer}
-          isOpen={true}
           onClose={() => setSelectedPhotographer(null)}
           onStartBooking={handleStartBookingFromDetail}
           isSaved={shortlistIds.includes(selectedPhotographer.id)}
           onToggleSave={() => handleToggleShortlist(selectedPhotographer.id)}
+          onOpenLightbox={(item) => setLightboxItem(item)}
         />
       )}
 
       {isBookingModalOpen && (
         <BookingSheetModal
-          isOpen={true}
           onClose={() => { setIsBookingModalOpen(false); setBookingConfig(null); }}
           photographer={bookingConfig?.photographer}
           photographers={photographers}
-          initialDate={bookingConfig?.selectedDate || targetDate}
-          initialDuration={bookingConfig?.durationType}
-          initialUsageRights={bookingConfig?.usageRights}
-          initialLocation={bookingConfig?.shootLocation}
+          initialConfig={bookingConfig || (targetDate ? { selectedDate: targetDate } as any : undefined)}
           onConfirmBooking={handleConfirmBooking}
         />
       )}
@@ -442,10 +448,9 @@ export const PhotographersPage: React.FC = () => {
       {lightboxItem && (
         <MediaLightbox
           item={lightboxItem}
-          items={allPortfolioItems}
-          isOpen={true}
+          allItems={allPortfolioItems}
           onClose={() => setLightboxItem(null)}
-          onSelect={(item) => setLightboxItem(item)}
+          onNavigate={(item) => setLightboxItem(item)}
         />
       )}
 

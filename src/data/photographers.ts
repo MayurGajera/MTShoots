@@ -64,7 +64,7 @@ export const INITIAL_PHOTOGRAPHERS: Photographer[] = [
     homeSliderPhotos: [
       'https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=1000&q=85',
       'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1000&q=85',
-      'https://images.unsplash.com/photo-1608755728617-aefab37d45f6?auto=format&fit=crop&w=1000&q=85'
+      'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=1000&q=85'
     ],
     portfolio: [
       {
@@ -96,7 +96,7 @@ export const INITIAL_PHOTOGRAPHERS: Photographer[] = [
         title: 'Patan Patola Double Ikat Geometry',
         clientOrSeries: 'Raw Mango Artisan Master Series',
         category: 'Documentary & Handloom Arts',
-        imageUrl: 'https://images.unsplash.com/photo-1608755728617-aefab37d45f6?auto=format&fit=crop&w=1000&q=85',
+        imageUrl: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=1000&q=85',
         aspectRatio: '1:1',
         year: '2026',
         location: 'Salvi Wada Weavers, Patan, North Gujarat',
