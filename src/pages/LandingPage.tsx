@@ -15,6 +15,8 @@ import { Photographer } from '../types';
 import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
 import { loadPhotographers, isSupabaseConfigured } from '../lib/supabase';
 import { fetchCategories, fetchTestimonials } from '@/lib/supabase';
+import { useApp } from '@/context/AppContext';
+import { CityAutocomplete } from '@/components/CityAutocomplete';
 
 const HERO_IMAGES = [
   'https://images.unsplash.com/photo-1537944434965-cf4679d1a598?auto=format&fit=crop&w=1600&q=85',
@@ -136,6 +138,7 @@ export const LandingPage: React.FC = () => {
     }).catch(() => {});
   }, []);
   const navigate = useNavigate();
+  const { handleLocationSelect, selectedCity } = useApp();
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroLoaded, setHeroLoaded] = useState(false);
 
@@ -149,6 +152,27 @@ export const LandingPage: React.FC = () => {
       return '';
     }
   });
+
+  // Sync when selectedCity changes site-wide
+  useEffect(() => {
+    const syncCity = () => {
+      const storedCity = localStorage.getItem('mtshoots_city');
+      const city = storedCity || selectedCity || '';
+      if (city && city !== searchCity) {
+        setSearchCity(city);
+      }
+    };
+
+    syncCity();
+    window.addEventListener('mtshoots-city-changed', syncCity);
+    window.addEventListener('storage', syncCity);
+
+    return () => {
+      window.removeEventListener('mtshoots-city-changed', syncCity);
+      window.removeEventListener('storage', syncCity);
+    };
+  }, [selectedCity, searchCity]);
+
   const [searchDate, setSearchDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
@@ -187,7 +211,10 @@ export const LandingPage: React.FC = () => {
     e.preventDefault();
     const params = new URLSearchParams();
     if (searchCategory && searchCategory !== 'All') params.set('category', searchCategory);
-    if (searchCity.trim()) params.set('city', searchCity.trim());
+    if (searchCity.trim()) {
+      params.set('city', searchCity.trim());
+      handleLocationSelect(searchCity.trim());
+    }
     if (searchDate) params.set('date', searchDate);
     navigate(`/photographers?${params.toString()}`);
   };
@@ -203,7 +230,7 @@ export const LandingPage: React.FC = () => {
           const city = data.address?.city || data.address?.town || data.address?.state_district || '';
           if (city) {
             setSearchCity(city);
-            try { localStorage.setItem('mtshoots_city', city); } catch {}
+            handleLocationSelect(city);
           }
         } catch {}
       });
@@ -356,12 +383,15 @@ export const LandingPage: React.FC = () => {
                       <Locate className="w-2.5 h-2.5" /> Near me
                     </button>
                   </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Mumbai, Delhi, Jaipur"
+                  <CityAutocomplete
                     value={searchCity}
-                    onChange={e => setSearchCity(e.target.value)}
-                    className="w-full bg-transparent text-xs font-bold text-[#181615] placeholder-[#8a726a] focus:outline-none"
+                    onChange={setSearchCity}
+                    onSelectCity={(city) => {
+                      setSearchCity(city);
+                      handleLocationSelect(city);
+                    }}
+                    placeholder="e.g. Mumbai, Delhi, Jaipur"
+                    inputClassName="text-xs font-bold text-[#181615] placeholder-[#8a726a]"
                   />
                 </div>
 

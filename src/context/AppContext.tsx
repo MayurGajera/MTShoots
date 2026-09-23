@@ -179,9 +179,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSelectedCity(city);
     try {
       localStorage.setItem('mtshoots_city', city);
+      window.dispatchEvent(new CustomEvent('mtshoots-city-changed', { detail: city }));
     } catch {}
     setShowLocationPicker(false);
-    triggerToast(`Showing photographers near ${city} ðŸ" `);
   };
 
   return (

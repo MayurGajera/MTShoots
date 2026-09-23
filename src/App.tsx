@@ -176,9 +176,11 @@ export default function App() {
 
   const handleLocationSelect = (city: string) => {
     setSelectedCity(city);
-    try { localStorage.setItem('mtshoots_city', city); } catch {}
+    try {
+      localStorage.setItem('mtshoots_city', city);
+      window.dispatchEvent(new CustomEvent('mtshoots-city-changed', { detail: city }));
+    } catch {}
     setShowLocationPicker(false);
-    triggerToast(`Showing photographers near ${city} ðŸ"`);
   };
 
   // App loading screen
