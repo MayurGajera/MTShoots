@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Download, X, Sparkles, Check, Smartphone, ShieldCheck } from 'lucide-react';
+import { Download, X, Sparkles, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useLocation } from '@/lib/navigation';
+import { useApp } from '@/context/AppContext';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -10,11 +12,16 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export const PwaInstallBanner: React.FC = () => {
+  const { pathname } = useLocation();
+  const { triggerToast } = useApp();
+
+  if (pathname === '/privacy' || pathname === '/terms' || pathname === '/cancellation') {
+    return null;
+  }
+
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [isInstalling, setIsInstalling] = useState(false);
   const [isIos, setIsIos] = useState(false);
-  const [installNote, setInstallNote] = useState<string | null>(null);
 
   useEffect(() => {
     // Detect iOS
@@ -29,55 +36,81 @@ export const PwaInstallBanner: React.FC = () => {
 
     if (isStandalone) return;
 
+    // Check if previously captured globally on window
+    if (typeof window !== 'undefined' && (window as any).__deferredPrompt) {
+      setDeferredPrompt((window as any).__deferredPrompt);
+    }
+
     // Listen for browser native install prompt
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      const promptEvt = e as BeforeInstallPromptEvent;
+      (window as any).__deferredPrompt = promptEvt;
+      setDeferredPrompt(promptEvt);
+    };
+
+    const handlePromptReady = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      if (customEvt.detail) {
+        setDeferredPrompt(customEvt.detail);
+      }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('pwa-prompt-ready', handlePromptReady);
 
-    // Show popup on launch time (after 1.2s welcoming delay) if not dismissed recently
-    const dismissedRecently = sessionStorage.getItem('mtshoots_pwa_dismissed');
+    // Show popup on launch if not dismissed recently
+    const dismissedRecently =
+      sessionStorage.getItem('mtshoots_pwa_dismissed') ||
+      localStorage.getItem('mtshoots_pwa_dismissed');
+
     let timer: NodeJS.Timeout;
     if (!dismissedRecently) {
       timer = setTimeout(() => {
         setIsVisible(true);
-      }, 1200);
+      }, 1500);
     }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('pwa-prompt-ready', handlePromptReady);
       clearTimeout(timer);
     };
   }, []);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      setIsInstalling(true);
+    const promptEvent = deferredPrompt || (typeof window !== 'undefined' ? (window as any).__deferredPrompt : null);
+
+    // ALWAYS hide the popup immediately upon clicking Install
+    setIsVisible(false);
+    sessionStorage.setItem('mtshoots_pwa_dismissed', 'true');
+    localStorage.setItem('mtshoots_pwa_dismissed', 'true');
+
+    if (promptEvent && typeof promptEvent.prompt === 'function') {
       try {
-        await deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-          setIsVisible(false);
-          sessionStorage.setItem('mtshoots_pwa_dismissed', 'true');
-        }
+        await promptEvent.prompt();
+        await promptEvent.userChoice;
       } catch (err) {
         console.warn('Install prompt error:', err);
       } finally {
-        setIsInstalling(false);
         setDeferredPrompt(null);
+        if (typeof window !== 'undefined') (window as any).__deferredPrompt = null;
       }
     } else if (isIos) {
-      setInstallNote("Tap Safari's Share button and choose 'Add to Home Screen' to install.");
+      if (triggerToast) {
+        triggerToast("Tap Safari's Share button and choose 'Add to Home Screen' to install.");
+      }
     } else {
-      setInstallNote("Tap your browser's menu (three dots) and select 'Install app'.");
+      if (triggerToast) {
+        triggerToast("Click the Install icon in your browser's address bar or menu (⋮) to install.");
+      }
     }
   };
 
   const handleDismiss = () => {
     setIsVisible(false);
     sessionStorage.setItem('mtshoots_pwa_dismissed', 'true');
+    localStorage.setItem('mtshoots_pwa_dismissed', 'true');
   };
 
   if (!isVisible) return null;
@@ -137,27 +170,15 @@ export const PwaInstallBanner: React.FC = () => {
             </div>
           </div>
 
-          {/* Simple Note if browser doesn't support direct JS prompt */}
-          {installNote && (
-            <motion.div
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-3 p-2.5 rounded-xl bg-[#FFF6F3] border border-[#FADCD1] text-xs font-medium text-[#C85A32] text-center"
-            >
-              {installNote}
-            </motion.div>
-          )}
-
           {/* Actions */}
           <div className="mt-5 flex items-center gap-2.5">
             <button
               type="button"
               onClick={handleInstallClick}
-              disabled={isInstalling}
-              className="flex-1 py-2.5 px-4 rounded-xl bg-[#C85A32] hover:bg-[#B24E2A] active:scale-[0.98] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#C85A32]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              className="flex-1 py-2.5 px-4 rounded-xl bg-[#C85A32] hover:bg-[#B24E2A] active:scale-[0.98] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#C85A32]/25 flex items-center justify-center gap-2 cursor-pointer"
             >
               <Download className="w-4 h-4 stroke-[2.5]" />
-              <span>{isInstalling ? 'Starting Installation...' : 'Install App'}</span>
+              <span>Install App</span>
             </button>
 
             <button
@@ -173,3 +194,5 @@ export const PwaInstallBanner: React.FC = () => {
     </AnimatePresence>
   );
 };
+
+export default PwaInstallBanner;

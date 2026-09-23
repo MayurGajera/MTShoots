@@ -318,13 +318,13 @@ export const AuthPage: React.FC = () => {
                         onChange={(e) => setOtpEmail(e.target.value)}
                         placeholder="you@example.com"
                         required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs focus:outline-none focus:border-[#C85A32]"
+                        className="w-full h-11 px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs sm:text-sm text-[#181615] placeholder:text-[#8a726a]/60 focus:outline-none focus:border-[#C85A32] focus:ring-2 focus:ring-[#C85A32]/25 transition-all"
                       />
                     </div>
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full py-2.5 rounded-xl bg-[#C85A32] hover:bg-[#b04a25] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+                      className="w-full py-3 rounded-xl bg-[#C85A32] hover:bg-[#b04a25] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
                     >
                       {isLoading ? <ButtonSpinner text="Sending Code..." /> : 'Send 6-Digit Verification Code'}
                     </button>
@@ -349,7 +349,9 @@ export const AuthPage: React.FC = () => {
                         {otpCode.map((digit, i) => (
                           <input
                             key={i}
-                            ref={(el) => (otpInputRefs.current[i] = el)}
+                            ref={(el) => {
+                              otpInputRefs.current[i] = el;
+                            }}
                             type="text"
                             inputMode="numeric"
                             maxLength={1}
@@ -382,7 +384,7 @@ export const AuthPage: React.FC = () => {
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full py-2.5 rounded-xl bg-[#C85A32] hover:bg-[#b04a25] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+                      className="w-full py-3 rounded-xl bg-[#C85A32] hover:bg-[#b04a25] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
                     >
                       {isLoading ? <ButtonSpinner text="Verifying..." /> : 'Verify Code'}
                     </button>
@@ -401,12 +403,15 @@ export const AuthPage: React.FC = () => {
                 {otpStage === 'newPassword' && (
                   <form onSubmit={handleResetPassword} className="space-y-4">
                     <div>
-                      <label className="block text-xs font-bold text-[#181615] mb-1.5">New Password</label>
+                      <label className="block text-xs font-bold text-[#181615] mb-1.5">New Password (min 6 characters)</label>
                       <input
                         type="password"
                         value={resetPassword}
                         onChange={(e) => setResetPassword(e.target.value)}
-                        placeholder="Enter password" />
+                        placeholder="Enter new password"
+                        required
+                        className="w-full h-11 px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs sm:text-sm text-[#181615] placeholder:text-[#8a726a]/60 focus:outline-none focus:border-[#C85A32] focus:ring-2 focus:ring-[#C85A32]/25 transition-all"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-[#181615] mb-1.5">Confirm New Password</label>
@@ -414,12 +419,15 @@ export const AuthPage: React.FC = () => {
                         type="password"
                         value={resetConfirmPassword}
                         onChange={(e) => setResetConfirmPassword(e.target.value)}
-                        placeholder="Enter password" />
+                        placeholder="Confirm new password"
+                        required
+                        className="w-full h-11 px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs sm:text-sm text-[#181615] placeholder:text-[#8a726a]/60 focus:outline-none focus:border-[#C85A32] focus:ring-2 focus:ring-[#C85A32]/25 transition-all"
+                      />
                     </div>
                     <button
                       type="submit"
-                      disabled={isLoading}
-                      className="w-full py-2.5 rounded-xl bg-[#2D593E] hover:bg-[#234731] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+                      disabled={isLoading || !resetPassword || resetPassword.length < 6 || resetPassword !== resetConfirmPassword}
+                      className="w-full py-3 rounded-xl bg-[#C85A32] hover:bg-[#b04a25] disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
                     >
                       {isLoading ? <ButtonSpinner text="Saving..." /> : 'Set New Password'}
                     </button>
@@ -582,7 +590,7 @@ export const AuthPage: React.FC = () => {
                               if (validationErrors.fullName) setValidationErrors(prev => ({ ...prev, fullName: '' }));
                             }}
                             placeholder='e.g. Rahul Sharma'
-                            className={'w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs placeholder:text-stone-400 placeholder:font-normal focus:outline-none transition-colors ' + (validationErrors.fullName ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
+                            className={'w-full h-11 px-3.5 rounded-xl border bg-white text-xs placeholder:text-stone-400 placeholder:font-normal focus:outline-none transition-colors ' + (validationErrors.fullName ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
                           />
                           {validationErrors.fullName && (
                             <p className='text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1'>
@@ -601,7 +609,7 @@ export const AuthPage: React.FC = () => {
                             value={city}
                             onChange={(e) => setCity(e.target.value)}
                             placeholder='e.g. Mumbai, Delhi, Bengaluru'
-                            className='w-full px-3.5 py-2.5 rounded-xl border border-[#E7E1DA] bg-white text-xs placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-[#C85A32]'
+                            className='w-full h-11 px-3.5 rounded-xl border border-[#E7E1DA] bg-white text-xs placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:border-[#C85A32]'
                           />
                         </div>
                       </div>
@@ -620,7 +628,7 @@ export const AuthPage: React.FC = () => {
                         if (validationErrors.email) setValidationErrors(prev => ({ ...prev, email: '' }));
                       }}
                       placeholder='e.g. rahul.sharma@example.com'
-                      className={'w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs focus:outline-none transition-colors ' + (validationErrors.email ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
+                      className={'w-full h-11 px-3.5 rounded-xl border bg-white text-xs focus:outline-none transition-colors ' + (validationErrors.email ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
                     />
                     {validationErrors.email && (
                       <p className='text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1'>
@@ -654,7 +662,7 @@ export const AuthPage: React.FC = () => {
                           if (validationErrors.password) setValidationErrors(prev => ({ ...prev, password: '' }));
                         }}
                         placeholder='Enter password (min 6 characters)'
-                        className={'w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs focus:outline-none transition-colors pr-10 ' + (validationErrors.password ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
+                        className={'w-full h-11 px-3.5 rounded-xl border bg-white text-xs focus:outline-none transition-colors pr-10 ' + (validationErrors.password ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
                       />
                       <button
                         type='button'
@@ -687,7 +695,7 @@ export const AuthPage: React.FC = () => {
                             if (validationErrors.confirmPassword) setValidationErrors(prev => ({ ...prev, confirmPassword: '' }));
                           }}
                           placeholder='Re-enter password'
-                          className={'w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs focus:outline-none transition-colors pr-10 ' + (validationErrors.confirmPassword ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
+                          className={'w-full h-11 px-3.5 rounded-xl border bg-white text-xs focus:outline-none transition-colors pr-10 ' + (validationErrors.confirmPassword ? 'border-red-500 focus:border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
                         />
                         <button
                           type='button'
@@ -710,7 +718,7 @@ export const AuthPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full py-3 rounded-xl bg-[#C85A32] hover:bg-[#b04a25] text-white text-xs font-bold transition-all shadow-sm cursor-pointer mt-2"
+                    className="w-full h-11 rounded-xl bg-[#C85A32] hover:bg-[#b04a25] text-white text-xs font-bold transition-all shadow-sm cursor-pointer mt-2 flex items-center justify-center"
                   >
                     {isLoading ? (
                       <ButtonSpinner text="Authenticating..." />
@@ -729,7 +737,7 @@ export const AuthPage: React.FC = () => {
 
       {/* Footer minimal */}
       <div className="p-4 text-center text-xs text-[#8a726a]">
-        Â© 2026 MTShoots India. All rights reserved.
+        © 2026 MTShoots India. All rights reserved.
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AppProvider, useApp } from '@/context/AppContext';
+import { useLocation } from '@/lib/navigation';
 import { PwaNav } from '@/components/PwaNav';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { ScrollToTopButton } from '@/components/ScrollToTopButton';
@@ -10,8 +11,12 @@ import { LocationPickerModal } from '@/components/LocationPickerModal';
 import { BookingSheetModal } from '@/components/BookingSheetModal';
 import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '@/data/photographers';
 import { ApertureLoader } from '@/components/ApertureLoader';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 function InnerShell({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation();
+  const isPolicyPage = pathname === '/privacy' || pathname === '/terms' || pathname === '/cancellation';
+
   const {
     bookings,
     shortlistIds,
@@ -41,7 +46,7 @@ function InnerShell({ children }: { children: React.ReactNode }) {
     window.addEventListener('open-location-picker', handleOpenLoc);
 
     const hasCity = localStorage.getItem('mtshoots_city');
-    if (!hasCity) {
+    if (!hasCity && !isPolicyPage) {
       setTimeout(() => setShowLocationPicker(true), 1200);
     }
     const timer = setTimeout(() => setIsAppLoading(false), 600);
@@ -50,7 +55,7 @@ function InnerShell({ children }: { children: React.ReactNode }) {
       window.removeEventListener('open-location-picker', handleOpenLoc);
       clearTimeout(timer);
     };
-  }, [setShowLocationPicker]);
+  }, [setShowLocationPicker, isPolicyPage]);
 
   if (isAppLoading) {
     return (
@@ -76,13 +81,13 @@ function InnerShell({ children }: { children: React.ReactNode }) {
       />
 
       {/* Global PWA Install Banner */}
-      <PwaInstallBanner />
+      {!isPolicyPage && <PwaInstallBanner />}
 
       {/* Floating Scroll To Top Button */}
       <ScrollToTopButton />
 
       {/* Location Picker Modal */}
-      {showLocationPicker && (
+      {showLocationPicker && !isPolicyPage && (
         <LocationPickerModal
           onSelect={handleLocationSelect}
           onDismiss={() => setShowLocationPicker(false)}
@@ -123,8 +128,12 @@ function InnerShell({ children }: { children: React.ReactNode }) {
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
-    <AppProvider>
-      <InnerShell>{children}</InnerShell>
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <React.Suspense fallback={<ApertureLoader />}>
+          <InnerShell>{children}</InnerShell>
+        </React.Suspense>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

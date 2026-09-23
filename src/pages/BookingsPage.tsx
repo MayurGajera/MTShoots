@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar, Clock, MapPin, CheckCircle2, Camera, AlertCircle,
   XCircle, User, FileText, ChevronDown, ChevronUp, Plus, ArrowLeft
@@ -10,7 +10,8 @@ import { BookingRequest, Photographer } from '../types';
 import { formatINR } from '../utils/format';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
-import { INITIAL_BOOKINGS, INITIAL_PHOTOGRAPHERS } from '../data/photographers';
+import { INITIAL_BOOKINGS, INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
+import { loadPhotographers } from '../lib/supabase';
 import { ShimmerBookingCard } from '../components/ShimmerCard';
 import { PhotographerDashboard } from '../components/PhotographerDashboard';
 
@@ -44,19 +45,28 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
     return <PhotographerDashboard user={currentUser} onOpenNewBooking={onOpenNewBooking} />;
   }
 
-  // Load from localStorage if not passed as props
-  const [bookings] = useState<BookingRequest[]>(() => {
-    if (propBookings) return propBookings;
-    try {
-      if (typeof window === 'undefined') return [];
-      const saved = localStorage.getItem('capturely_bookings');
-      return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
-    } catch { return INITIAL_BOOKINGS; }
-  });
+  const app = useApp();
+  const bookings = propBookings ?? app?.bookings ?? [];
+  const effectiveOpenNewBooking = onOpenNewBooking ?? app?.openNewBooking;
 
-  const photographers = propPhotographers || INITIAL_PHOTOGRAPHERS;
-  const [expandedId, setExpandedId] = useState<string | null>(bookings[0]?.id || null);
+  const [photographers, setPhotographers] = useState<Photographer[]>(() => propPhotographers || getAllPhotographers());
+
+  useEffect(() => {
+    if (!propPhotographers) {
+      loadPhotographers().then(remote => {
+        if (remote && remote.length > 0) setPhotographers(remote);
+      }).catch(() => {});
+    }
+  }, [propPhotographers]);
+
+  const [expandedId, setExpandedId] = useState<string | null>(() => bookings[0]?.id || null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!expandedId && bookings.length > 0) {
+      setExpandedId(bookings[0]?.id || null);
+    }
+  }, [bookings, expandedId]);
 
   const activeBooking = bookings.find(b => b.id === expandedId) || bookings[0];
 
@@ -178,15 +188,15 @@ export const BookingsPage: React.FC<BookingsPageProps> = ({
             {activeBooking ? (
               <div className="bg-white rounded-2xl border border-[#E7E1DA] overflow-hidden shadow-sm animate-fadeIn">
                 {/* Header */}
-                <div className="bg-[#FAF8F5] border-b border-[#E7E1DA] px-6 py-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
+                <div className="bg-[#FAF8F5] border-b border-[#E7E1DA] px-4 sm:px-6 py-4 sm:py-5">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                    <div className="min-w-0 flex-1">
                       <div className="text-[10px] uppercase font-bold tracking-widest text-[#C85A32] mb-1">Booking Reference</div>
-                      <h2 className="font-serif text-2xl font-bold text-[#181615]">{activeBooking.id}</h2>
+                      <h2 className="font-serif text-lg sm:text-2xl font-bold text-[#181615] tracking-tight break-keep whitespace-nowrap overflow-hidden text-ellipsis">{activeBooking.id}</h2>
                       <p className="text-xs text-[#8a726a] mt-0.5">Created on {activeBooking.createdAt}</p>
                     </div>
-                    <div className={`flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-full ${STATUS_CONFIG[activeBooking.status]?.bg} ${STATUS_CONFIG[activeBooking.status]?.color}`}>
-                      {React.createElement(STATUS_CONFIG[activeBooking.status]?.icon || CheckCircle2, { className: 'w-4 h-4' })}
+                    <div className={`self-start sm:self-auto shrink-0 flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full ${STATUS_CONFIG[activeBooking.status]?.bg} ${STATUS_CONFIG[activeBooking.status]?.color}`}>
+                      {React.createElement(STATUS_CONFIG[activeBooking.status]?.icon || CheckCircle2, { className: 'w-3.5 h-3.5 sm:w-4 sm:h-4' })}
                       {STATUS_CONFIG[activeBooking.status]?.label || 'Confirmed'}
                     </div>
                   </div>

@@ -1,5 +1,5 @@
 'use client';
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Calendar,
   Plus,
@@ -112,6 +112,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [settingsStartingRate, setSettingsStartingRate] = useState<number>(40000);
   const [settingsCameraBodies, setSettingsCameraBodies] = useState('');
   const [settingsLenses, setSettingsLenses] = useState('');
+  const [initialSettings, setInitialSettings] = useState<{
+    name: string;
+    phone: string;
+    city: string;
+    avatar: string;
+    brandName: string;
+    genre: string;
+    bio: string;
+    startingRate: number;
+    cameraBodies: string;
+    lenses: string;
+  } | null>(null);
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState('');
@@ -142,12 +154,62 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   });
 
+  // Calculate if Settings form has actual changes
+  const isSettingsDirty = useMemo(() => {
+    if (!initialSettings) return false;
+    if (settingsName.trim() !== initialSettings.name) return true;
+    if (settingsPhone.trim() !== initialSettings.phone) return true;
+    if (settingsCity.trim() !== initialSettings.city) return true;
+    if (settingsAvatar !== initialSettings.avatar) return true;
+    if (user?.role === 'photographer') {
+      if (settingsBrandName.trim() !== initialSettings.brandName) return true;
+      if (settingsGenre !== initialSettings.genre) return true;
+      if (settingsBio.trim() !== initialSettings.bio) return true;
+      if (Number(settingsStartingRate) !== initialSettings.startingRate) return true;
+      if (settingsCameraBodies.trim() !== initialSettings.cameraBodies) return true;
+      if (settingsLenses.trim() !== initialSettings.lenses) return true;
+    }
+    return false;
+  }, [
+    initialSettings,
+    settingsName,
+    settingsPhone,
+    settingsCity,
+    settingsAvatar,
+    settingsBrandName,
+    settingsGenre,
+    settingsBio,
+    settingsStartingRate,
+    settingsCameraBodies,
+    settingsLenses,
+    user?.role
+  ]);
+
+  const isPasswordValid = Boolean(
+    currentPassword.trim() &&
+    newPassword.length >= 6 &&
+    confirmPassword.length >= 6 &&
+    newPassword === confirmPassword
+  );
+
+  // Lock background body scroll when any modal is open
+  useEffect(() => {
+    const isAnyModalOpen = isSettingsOpen || isPasswordModalOpen;
+    if (isAnyModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isSettingsOpen, isPasswordModalOpen]);
+
   // Sync user state with storage
   useEffect(() => {
     const handleStorage = () => {
       try {
         if (typeof window === 'undefined') return null;
-      const stored = localStorage.getItem('mtshoots_user');
+        const stored = localStorage.getItem('mtshoots_user');
         setUser(stored ? JSON.parse(stored) : null);
         const city = localStorage.getItem('mtshoots_city');
         if (city) setCurrentCity(city);
@@ -179,24 +241,45 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleOpenSettings = () => {
     if (user) {
-      setSettingsName(user.fullName || '');
-      setSettingsPhone(user.phone || '');
-      setSettingsCity(user.city || currentCity);
-      setSettingsAvatar(user.avatar || '');
+      const init = {
+        name: user.fullName || '',
+        phone: user.phone || '',
+        city: user.city || currentCity,
+        avatar: user.avatar || '',
+        brandName: '',
+        genre: 'Wedding',
+        bio: '',
+        startingRate: 40000,
+        cameraBodies: '',
+        lenses: ''
+      };
+      setSettingsName(init.name);
+      setSettingsPhone(init.phone);
+      setSettingsCity(init.city);
+      setSettingsAvatar(init.avatar);
+
       if (user.role === 'photographer') {
         try {
           const storedProfile = localStorage.getItem('mtshoots_photographer_profile');
           if (storedProfile) {
             const p = JSON.parse(storedProfile);
-            setSettingsBrandName(p.brandName || p.name || user.fullName || '');
-            setSettingsGenre(p.primaryDiscipline || p.discipline || p.genre || 'Wedding');
-            setSettingsBio(p.bio || '');
-            setSettingsStartingRate(Number(p.startingDayRate || p.startingRate || 40000));
-            setSettingsCameraBodies(Array.isArray(p.equipment?.cameraBodies) ? p.equipment.cameraBodies.join(', ') : (p.gear || ''));
-            setSettingsLenses(Array.isArray(p.equipment?.lenses) ? p.equipment.lenses.join(', ') : '');
+            init.brandName = p.brandName || p.name || user.fullName || '';
+            init.genre = p.primaryDiscipline || p.discipline || p.genre || 'Wedding';
+            init.bio = p.bio || '';
+            init.startingRate = Number(p.startingDayRate || p.startingRate || 40000);
+            init.cameraBodies = Array.isArray(p.equipment?.cameraBodies) ? p.equipment.cameraBodies.join(', ') : (p.gear || '');
+            init.lenses = Array.isArray(p.equipment?.lenses) ? p.equipment.lenses.join(', ') : '';
+
+            setSettingsBrandName(init.brandName);
+            setSettingsGenre(init.genre);
+            setSettingsBio(init.bio);
+            setSettingsStartingRate(init.startingRate);
+            setSettingsCameraBodies(init.cameraBodies);
+            setSettingsLenses(init.lenses);
           }
         } catch {}
       }
+      setInitialSettings(init);
       if (user.email) {
         loadUserAccountData(user.email);
       }
@@ -284,7 +367,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         phone: settingsPhone.trim(),
         city: settingsCity.trim() || currentCity,
         avatar_url: settingsAvatar || '',
-        role: user.role || 'customer'
+        role: user.role === 'photographer' ? 'photographer' : 'customer'
       });
     } catch (err) {
       console.warn('Could not sync user profile update to Supabase:', err);
@@ -521,9 +604,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <div className="text-[11px] text-[#8a726a] truncate">{user.email}</div>
                           </div>
                         </div>
-                        <div className="mt-2 flex items-center justify-between text-[10px] text-[#2D593E] font-bold bg-[#EAF4ED] px-2 py-0.5 rounded-full">
-                          <span>âœ" Verified Client</span>
-                          <span>{user.city || currentCity}</span>
+                        <div className="mt-2.5 flex items-center justify-between text-[11px] text-[#2D593E] font-semibold bg-[#EAF4ED] px-2.5 py-1 rounded-lg">
+                          <span className="flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#2D593E] shrink-0" />
+                            <span>Verified Client</span>
+                          </span>
+                          <span className="font-bold uppercase tracking-wider text-[10px] text-[#2D593E]/80">
+                            {user.city || currentCity}
+                          </span>
                         </div>
                       </div>
 
@@ -604,47 +692,56 @@ export const Navbar: React.FC<NavbarProps> = ({
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
-              className="md:hidden border-t border-[#E7E1DA] py-3 space-y-1 overflow-hidden"
+              className="md:hidden border-t border-[#E7E1DA] py-3 px-1 space-y-2 overflow-hidden"
             >
               {user && (
-                <div className="p-3 bg-[#FAF8F5] rounded-xl mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="p-3 bg-[#FAF8F5] rounded-2xl mb-2 flex items-center justify-between border border-[#E7E1DA]/80">
+                  <div className="flex items-center gap-3 min-w-0">
                     {hasUserAvatar ? (
-                      <img src={user.avatar} alt={user.fullName} className="w-8 h-8 rounded-full object-cover" />
+                      <img src={user.avatar} alt={user.fullName} className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-white shadow-xs" />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-white border border-[#E7E1DA] flex items-center justify-center text-[#C85A32]">
-                        <User className="w-4 h-4" />
+                      <div className="w-10 h-10 rounded-full bg-white border border-[#E7E1DA] flex items-center justify-center text-[#C85A32] shrink-0 shadow-xs">
+                        <User className="w-5 h-5" />
                       </div>
                     )}
-                    <div>
-                      <div className="text-xs font-bold text-[#181615]">{user.fullName}</div>
-                      <div className="text-[10px] text-[#8a726a]">{user.email}</div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-[#181615] truncate leading-tight">{user.fullName}</div>
+                      <div className="text-xs text-[#8a726a] truncate mt-0.5">{user.email}</div>
                     </div>
                   </div>
-                  <button onClick={handleOpenSettings} className="text-xs text-[#C85A32] font-semibold">Edit</button>
+                  <button
+                    onClick={handleOpenSettings}
+                    className="text-xs text-[#C85A32] hover:text-[#b04a25] font-semibold px-2.5 py-1 rounded-lg hover:bg-white transition-colors cursor-pointer shrink-0"
+                  >
+                    Edit
+                  </button>
                 </div>
               )}
 
-              {/* Centered navigation items with icons */}
-              <div className="flex flex-col items-center gap-1.5 py-1.5">
+              {/* Left-aligned navigation items with consistent icons and spacing */}
+              <div className="flex flex-col gap-1 py-1">
                 <Link
                   to="/photographers"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors"
                 >
-                  <Camera className="w-4 h-4 text-[#C85A32]" />
-                  <span>Photographers Directory</span>
+                  <div className="w-8 h-8 rounded-lg bg-[#FAF8F5] border border-[#E7E1DA]/80 flex items-center justify-center shrink-0 text-[#C85A32]">
+                    <Camera className="w-4 h-4" />
+                  </div>
+                  <span className="flex-1 text-left">Photographers Directory</span>
                 </Link>
 
                 <Link
                   to="/bookings"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors"
                 >
-                  <Calendar className="w-4 h-4 text-[#C85A32]" />
-                  <span>Bookings</span>
+                  <div className="w-8 h-8 rounded-lg bg-[#FAF8F5] border border-[#E7E1DA]/80 flex items-center justify-center shrink-0 text-[#C85A32]">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <span className="flex-1 text-left">Bookings</span>
                   {bookingCount > 0 && (
-                    <span className="ml-1 px-2 py-0.5 rounded-full bg-[#FAF8F5] text-[11px] font-bold text-[#C85A32] border border-[#E7E1DA]">
+                    <span className="ml-auto px-2 py-0.5 rounded-full bg-[#FAF8F5] text-xs font-bold text-[#C85A32] border border-[#E7E1DA]">
                       {bookingCount}
                     </span>
                   )}
@@ -653,12 +750,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Link
                   to="/saved"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors"
                 >
-                  <Heart className="w-4 h-4 text-[#C85A32]" />
-                  <span>Saved Photographers</span>
+                  <div className="w-8 h-8 rounded-lg bg-[#FAF8F5] border border-[#E7E1DA]/80 flex items-center justify-center shrink-0 text-[#C85A32]">
+                    <Heart className="w-4 h-4" />
+                  </div>
+                  <span className="flex-1 text-left">Saved Photographers</span>
                   {shortlistCount > 0 && (
-                    <span className="ml-1 px-2 py-0.5 rounded-full bg-[#FAF8F5] text-[11px] font-bold text-[#C85A32] border border-[#E7E1DA]">
+                    <span className="ml-auto px-2 py-0.5 rounded-full bg-[#FAF8F5] text-xs font-bold text-[#C85A32] border border-[#E7E1DA]">
                       {shortlistCount}
                     </span>
                   )}
@@ -667,10 +766,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Link
                   to="/photographers/apply"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-[#C85A32] hover:bg-[#FAF8F5] transition-colors active:scale-[0.99]"
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-bold text-[#C85A32] hover:bg-[#FAF8F5] transition-colors"
                 >
-                  <Plus className="w-4 h-4 text-[#C85A32]" />
-                  <span>Join as Photographer</span>
+                  <div className="w-8 h-8 rounded-lg bg-[#FAF8F5] border border-[#E7E1DA]/80 flex items-center justify-center shrink-0 text-[#C85A32]">
+                    <Plus className="w-4 h-4" />
+                  </div>
+                  <span className="flex-1 text-left">Join as Photographer</span>
                 </Link>
               </div>
 
@@ -678,16 +779,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {user ? (
                   <button
                     onClick={handleSignOut}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 cursor-pointer transition-colors"
+                    className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 cursor-pointer transition-colors"
                   >
-                    <LogOut className="w-4 h-4" />
-                    <span>Sign Out</span>
+                    <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0 text-red-600">
+                      <LogOut className="w-4 h-4" />
+                    </div>
+                    <span className="flex-1 text-left">Sign Out</span>
                   </button>
                 ) : (
                   <Link
                     to="/auth"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#181615] text-white font-bold text-xs shadow-md hover:bg-black transition-all active:scale-[0.98]"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#181615] text-white font-bold text-sm shadow-md hover:bg-black transition-all active:scale-[0.98]"
                   >
                     <User className="w-4 h-4" />
                     <span>Sign In to Account</span>
@@ -703,180 +806,186 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     {/* Account Settings Modal */}
       {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] my-auto flex flex-col p-5 sm:p-6 space-y-4 shadow-2xl border border-[#E7E1DA] overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[min(90vh,calc(100dvh-2rem))] flex flex-col shadow-2xl border border-[#E7E1DA] overflow-hidden animate-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E1DA] shrink-0">
+            <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b border-[#E7E1DA] shrink-0">
               <div className="flex items-center gap-2">
                 <Settings className="w-4 h-4 text-[#C85A32]" />
                 <h3 className="font-serif text-lg font-bold text-[#181615]">Account Settings</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsSettingsOpen(false)}
-                className="p-1 rounded-full text-[#8a726a] hover:text-[#181615] hover:bg-[#FAF8F5]"
+                className="p-1 rounded-full text-[#8a726a] hover:text-[#181615] hover:bg-[#FAF8F5] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Tabs Header */}
-            <div className="flex items-center gap-1.5 p-1 bg-[#F4EFEB] rounded-xl shrink-0">
-              <button
-                type="button"
-                onClick={() => setSettingsTab('profile')}
-                className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ' + (settingsTab === 'profile' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
-              >
-                Profile
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsTab('addresses')}
-                className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ' + (settingsTab === 'addresses' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
-              >
-                Addresses
-                <span className="px-1.5 py-0.2 bg-[#C85A32]/10 text-[#C85A32] rounded-full text-[10px]">{userAddresses.length}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsTab('devices')}
-                className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ' + (settingsTab === 'devices' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
-              >
-                Devices
-                <span className="px-1.5 py-0.2 bg-[#C85A32]/10 text-[#C85A32] rounded-full text-[10px]">{userDevices.length}</span>
-              </button>
+            <div className="p-3 sm:px-5 border-b border-[#E7E1DA]/60 shrink-0 bg-[#FAF8F5]">
+              <div className="flex items-center gap-1.5 p-1 bg-[#F4EFEB] rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setSettingsTab('profile')}
+                  className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ' + (settingsTab === 'profile' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
+                >
+                  Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingsTab('addresses')}
+                  className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer ' + (settingsTab === 'addresses' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
+                >
+                  Addresses
+                  <span className="px-1.5 py-0.2 bg-[#C85A32]/10 text-[#C85A32] rounded-full text-[10px]">{userAddresses.length}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingsTab('devices')}
+                  className={'flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer ' + (settingsTab === 'devices' ? 'bg-white text-[#181615] shadow-xs' : 'text-[#8a726a] hover:text-[#181615]')}
+                >
+                  Devices
+                  <span className="px-1.5 py-0.2 bg-[#C85A32]/10 text-[#C85A32] rounded-full text-[10px]">{userDevices.length}</span>
+                </button>
+              </div>
             </div>
 
             {/* Tab 1: Profile */}
             {settingsTab === 'profile' && (
-              <form onSubmit={handleSaveSettings} className="space-y-4 overflow-y-auto pr-1 flex-1">
-                {/* Avatar & Photo Picker */}
-                <AvatarPicker
-                  value={settingsAvatar}
-                  onChange={setSettingsAvatar}
-                  label='Profile Photo (Optional)'
-                  helperText='Upload your custom photo or leave empty for default profile icon'
-                />
+              <form onSubmit={handleSaveSettings} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+                  {/* Avatar & Photo Picker */}
+                  <AvatarPicker
+                    value={settingsAvatar}
+                    onChange={setSettingsAvatar}
+                    label='Profile Photo (Optional)'
+                    helperText='Upload your custom photo or leave empty for default profile icon'
+                  />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-[#181615] mb-1">Full Legal Name</label>
-                    <Input
-                      value={settingsName}
-                      onChange={(e) => setSettingsName(e.target.value)}
-                      placeholder="e.g. Rahul Sharma"
-                      required
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-[#181615] mb-1">Full Legal Name</label>
+                      <Input
+                        value={settingsName}
+                        onChange={(e) => setSettingsName(e.target.value)}
+                        placeholder="e.g. Rahul Sharma"
+                        required
+                      />
+                    </div>
+
+                    {user?.role === 'photographer' && (
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Brand / Studio Name</label>
+                        <Input
+                          value={settingsBrandName}
+                          onChange={(e) => setSettingsBrandName(e.target.value)}
+                          placeholder="e.g. Lumina Studio Arts"
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#181615] mb-1">Phone Number</label>
+                      <Input
+                        value={settingsPhone}
+                        onChange={(e) => setSettingsPhone(e.target.value)}
+                        placeholder="e.g. +91 98765 43210"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#181615] mb-1">Base City</label>
+                      <Input
+                        value={settingsCity}
+                        onChange={(e) => setSettingsCity(e.target.value)}
+                        placeholder="e.g. Mumbai, Maharashtra"
+                      />
+                    </div>
                   </div>
 
                   {user?.role === 'photographer' && (
-                    <div>
-                      <label className="block text-xs font-bold text-[#181615] mb-1">Brand / Studio Name</label>
-                      <Input
-                        value={settingsBrandName}
-                        onChange={(e) => setSettingsBrandName(e.target.value)}
-                        placeholder="e.g. Lumina Studio Arts"
-                      />
-                    </div>
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-[#181615] mb-1">Primary Discipline</label>
+                          <select
+                            value={settingsGenre}
+                            onChange={(e) => setSettingsGenre(e.target.value)}
+                            className="w-full h-10 rounded-xl border border-[#E7E1DA] bg-white px-3 py-1 text-xs text-[#181615] focus:outline-none focus:ring-2 focus:ring-[#C85A32]/25 focus:border-[#C85A32]"
+                          >
+                            <option value="Wedding">Wedding Photography</option>
+                            <option value="Pre-Wedding">Pre-Wedding & Couple Portraits</option>
+                            <option value="Fashion">Fashion & Lookbook Editorial</option>
+                            <option value="Commercial">Commercial & Advertising</option>
+                            <option value="Product">Product & E-Commerce</option>
+                            <option value="Architecture">Architecture & Interior</option>
+                            <option value="Portrait">Corporate & Portraiture</option>
+                            <option value="Food">Food & Beverage</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-[#181615] mb-1">Starting Day Rate (₹ INR)</label>
+                          <Input
+                            type="number"
+                            min="5000"
+                            step="1000"
+                            value={settingsStartingRate}
+                            onChange={(e) => setSettingsStartingRate(Number(e.target.value))}
+                            placeholder="e.g. 40000"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#181615] mb-1">Professional Bio</label>
+                        <textarea
+                          value={settingsBio}
+                          onChange={(e) => setSettingsBio(e.target.value)}
+                          rows={3}
+                          placeholder="Describe your photography journey, creative vision, and client experience..."
+                          className="w-full rounded-xl border border-[#E7E1DA] bg-white p-3 text-xs text-[#181615] focus:outline-none focus:ring-2 focus:ring-[#C85A32]/25 focus:border-[#C85A32] leading-relaxed"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-[#181615] mb-1">Camera Bodies & Gear</label>
+                          <Input
+                            value={settingsCameraBodies}
+                            onChange={(e) => setSettingsCameraBodies(e.target.value)}
+                            placeholder="e.g. Sony A7 IV, Canon EOS R5"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-[#181615] mb-1">Prime & Zoom Lenses</label>
+                          <Input
+                            value={settingsLenses}
+                            onChange={(e) => setSettingsLenses(e.target.value)}
+                            placeholder="e.g. 24-70mm f/2.8, 85mm f/1.4"
+                          />
+                        </div>
+                      </div>
+                    </>
                   )}
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#181615] mb-1">Phone Number</label>
-                    <Input
-                      value={settingsPhone}
-                      onChange={(e) => setSettingsPhone(e.target.value)}
-                      placeholder="e.g. +91 98765 43210"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#181615] mb-1">Base City</label>
-                    <Input
-                      value={settingsCity}
-                      onChange={(e) => setSettingsCity(e.target.value)}
-                      placeholder="e.g. Mumbai, Maharashtra"
-                    />
-                  </div>
                 </div>
 
-                {user?.role === 'photographer' && (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-[#181615] mb-1">Primary Discipline</label>
-                        <select
-                          value={settingsGenre}
-                          onChange={(e) => setSettingsGenre(e.target.value)}
-                          className="w-full h-9 rounded-xl border border-[#E7E1DA] bg-white px-3 py-1 text-xs text-[#181615] focus:outline-none focus:ring-2 focus:ring-[#C85A32]"
-                        >
-                          <option value="Wedding">Wedding Photography</option>
-                          <option value="Pre-Wedding">Pre-Wedding & Couple Portraits</option>
-                          <option value="Fashion">Fashion & Lookbook Editorial</option>
-                          <option value="Commercial">Commercial & Advertising</option>
-                          <option value="Product">Product & E-Commerce</option>
-                          <option value="Architecture">Architecture & Interior</option>
-                          <option value="Portrait">Corporate & Portraiture</option>
-                          <option value="Food">Food & Beverage</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#181615] mb-1">Starting Day Rate (₹ INR)</label>
-                        <Input
-                          type="number"
-                          min="5000"
-                          step="1000"
-                          value={settingsStartingRate}
-                          onChange={(e) => setSettingsStartingRate(Number(e.target.value))}
-                          placeholder="e.g. 40000"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-[#181615] mb-1">Professional Bio</label>
-                      <textarea
-                        value={settingsBio}
-                        onChange={(e) => setSettingsBio(e.target.value)}
-                        rows={3}
-                        placeholder="Describe your photography journey, creative vision, and client experience..."
-                        className="w-full rounded-xl border border-[#E7E1DA] bg-white p-3 text-xs text-[#181615] focus:outline-none focus:ring-2 focus:ring-[#C85A32] leading-relaxed"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-[#181615] mb-1">Camera Bodies & Gear</label>
-                        <Input
-                          value={settingsCameraBodies}
-                          onChange={(e) => setSettingsCameraBodies(e.target.value)}
-                          placeholder="e.g. Sony A7 IV, Canon EOS R5"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#181615] mb-1">Prime & Zoom Lenses</label>
-                        <Input
-                          value={settingsLenses}
-                          onChange={(e) => setSettingsLenses(e.target.value)}
-                          placeholder="e.g. 24-70mm f/2.8, 85mm f/1.4"
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="flex justify-end gap-2 pt-2 border-t border-[#E7E1DA]">
+                <div className="flex justify-end gap-2 p-3 sm:p-4 sm:px-5 border-t border-[#E7E1DA] bg-[#FAF8F5]/80 shrink-0">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setIsSettingsOpen(false)}
-                    className="text-xs font-semibold"
+                    className="text-xs font-semibold cursor-pointer"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
-                    className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs"
+                    disabled={!isSettingsDirty || !settingsName.trim()}
+                    className="bg-[#C85A32] hover:bg-[#b04a25] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs cursor-pointer shadow-sm px-4"
                   >
                     Save Changes
                   </Button>
@@ -886,7 +995,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Tab 2: Addresses (Multi-Address) */}
             {settingsTab === 'addresses' && (
-              <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+              <div className="p-4 sm:p-5 space-y-3 overflow-y-auto flex-1 min-h-0">
                 <div className="flex items-center justify-between">
                   <div className="text-xs font-bold text-[#181615]">Saved Shoot & Billing Addresses</div>
                   <Button
@@ -1017,7 +1126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Tab 3: Devices (Multi-Device Access) */}
             {settingsTab === 'devices' && (
-              <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+              <div className="p-4 sm:p-5 space-y-3 overflow-y-auto flex-1 min-h-0">
                 <div className="text-xs text-[#8a726a]">
                   These devices and sessions currently have active access to your MTShoots account.
                 </div>
@@ -1070,75 +1179,82 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Change Password Modal */}
       {isPasswordModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] my-auto overflow-y-auto p-6 space-y-4 shadow-2xl border border-[#E7E1DA]">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E7E1DA]">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full max-h-[min(90vh,calc(100dvh-2rem))] flex flex-col shadow-2xl border border-[#E7E1DA] overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b border-[#E7E1DA] shrink-0">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-[#C85A32]" />
                 <h3 className="font-serif text-lg font-bold text-[#181615]">Change Password</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsPasswordModalOpen(false)}
-                className="p-1 rounded-full text-[#8a726a] hover:text-[#181615] hover:bg-[#FAF8F5]"
+                className="p-1 rounded-full text-[#8a726a] hover:text-[#181615] hover:bg-[#FAF8F5] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {passwordSuccess ? (
-              <div className="text-center py-6 space-y-2">
+              <div className="text-center py-8 p-6 space-y-2 flex-1">
                 <div className="w-12 h-12 rounded-full bg-[#EAF4ED] text-[#2D593E] flex items-center justify-center mx-auto">
                   <Check className="w-6 h-6" />
                 </div>
                 <div className="text-sm font-bold text-[#181615]">Password Successfully Updated!</div>
               </div>
             ) : (
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                {passwordError && (
-                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-medium">
-                    {passwordError}
+              <form onSubmit={handleChangePassword} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+                  {passwordError && (
+                    <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-medium">
+                      {passwordError}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Current Password</label>
+                    <Input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Enter current password"
+                    />
                   </div>
-                )}
 
-                <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1">Current Password</label>
-                  <Input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter password" />
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">New Password (min 6 characters)</label>
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#181615] mb-1">Confirm New Password</label>
+                    <Input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter new password"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1">New Password (min 6 characters)</label>
-                  <Input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter password" />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#181615] mb-1">Confirm New Password</label>
-                  <Input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Enter password" />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2 border-t border-[#E7E1DA]">
+                <div className="flex justify-end gap-2 p-3 sm:p-4 sm:px-5 border-t border-[#E7E1DA] bg-[#FAF8F5]/80 shrink-0">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setIsPasswordModalOpen(false)}
-                    className="text-xs font-semibold"
+                    className="text-xs font-semibold cursor-pointer"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
-                    className="bg-[#C85A32] hover:bg-[#b04a25] text-white font-bold text-xs"
+                    disabled={!isPasswordValid}
+                    className="bg-[#C85A32] hover:bg-[#b04a25] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs cursor-pointer shadow-sm px-4"
                   >
                     Update Password
                   </Button>

@@ -38,11 +38,11 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
   const isAllSelected = !selectedCategory || selectedCategory === 'all' || selectedCategory === 'All Categories';
 
   return (
-    <div className="mb-6">
+    <div className="mb-6 w-full max-w-full min-w-0">
       <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center space-x-2">
-          <Sparkles className="w-4 h-4 text-[#C85A32]" />
-          <h2 className="text-sm font-semibold tracking-wide uppercase text-[#181615]">
+        <div className="flex items-center space-x-2 min-w-0">
+          <Sparkles className="w-4 h-4 text-[#C85A32] shrink-0" />
+          <h2 className="text-xs sm:text-sm font-semibold tracking-wide uppercase text-[#181615] truncate">
             Explore By Photography Genre
           </h2>
           <span className="text-xs text-[#8a726a] font-normal hidden sm:inline">
@@ -52,7 +52,7 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
         {!isAllSelected && (
           <button
             onClick={() => onSelectCategory('all')}
-            className="text-xs font-semibold text-[#C85A32] hover:text-[#9f3c16] hover:underline cursor-pointer"
+            className="text-xs font-semibold text-[#C85A32] hover:text-[#9f3c16] hover:underline cursor-pointer shrink-0 ml-2"
           >
             View All Genres ({totalPhotographersCount ?? photographerCountsByCategory['all'] ?? 14})
           </button>
@@ -60,7 +60,7 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
       </div>
 
       {/* Category Scroll Stream */}
-      <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-none no-scrollbar">
+      <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-none no-scrollbar w-full min-w-0 px-1 snap-x snap-mandatory">
         {categories.map((cat: PhotographyCategory) => {
           const isAll = cat.id === 'all';
           const isSelected = isAll
@@ -80,7 +80,7 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
               key={cat.id}
               id={`category-flow-btn-${cat.id}`}
               onClick={() => onSelectCategory(isAll ? 'all' : cat.name)}
-              className={`group flex items-center space-x-2.5 px-3 py-2 rounded-2xl border transition-all duration-200 shrink-0 cursor-pointer text-left ${
+              className={`group flex items-center space-x-2.5 px-3 py-2 rounded-2xl border transition-all duration-200 shrink-0 cursor-pointer text-left snap-start ${
                 isSelected
                   ? 'bg-white border-[#C85A32] ring-2 ring-[#C85A32]/20 shadow-md scale-[1.02]'
                   : 'bg-white/80 border-[#E7E1DA] hover:bg-white hover:border-[#dec0b7] hover:shadow-xs'
