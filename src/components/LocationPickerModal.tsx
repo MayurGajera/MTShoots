@@ -36,6 +36,66 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   useScrollLock(true);
 
+  const sanitizeCityName = (raw: string): string => {
+    let name = raw.trim();
+    if (!name) return '';
+    name = name.replace(/\s*(Suburban|Urban|District|Division|Metropolitan|Region)\s*/gi, '').trim();
+    return name;
+  };
+
+  const detectLocation = () => {
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+      return;
+    }
+    setIsDetecting(true);
+    setPermissionDenied(false);
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        let detected = '';
+
+        // 1. Try BigDataCloud reverse geocode (fast, CORS-enabled, client-safe, free)
+        try {
+          const resp = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            const raw = data.city || data.locality || data.principalSubdivision || '';
+            if (raw) detected = sanitizeCityName(raw);
+          }
+        } catch {}
+
+        // 2. Fallback to Nominatim OSM if needed
+        if (!detected) {
+          try {
+            const resp = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`
+            );
+            if (resp.ok) {
+              const data = await resp.json();
+              const addr = data.address || {};
+              const raw = addr.city || addr.town || addr.state_district || addr.district || addr.county || addr.suburb || '';
+              if (raw) detected = sanitizeCityName(raw);
+            }
+          } catch {}
+        }
+
+        if (detected) {
+          setDetectedCity(detected);
+        }
+        setIsDetecting(false);
+      },
+      (err) => {
+        console.warn('Geolocation error:', err);
+        setPermissionDenied(true);
+        setIsDetecting(false);
+      },
+      { timeout: 9000, enableHighAccuracy: true, maximumAge: 60000 }
+    );
+  };
+
   useEffect(() => {
     // Load dynamic cities from Supabase
     fetchCities().then(dbCities => {
@@ -44,34 +104,10 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       }
     }).catch(() => {});
 
-    // Try to auto-detect location
-    if (!initialCity) {
-      setIsDetecting(true);
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            try {
-              const resp = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`
-              );
-              const data = await resp.json();
-              const city = data.address?.city || data.address?.town || data.address?.county || '';
-              if (city) setDetectedCity(city);
-            } catch {}
-            setIsDetecting(false);
-          },
-          () => {
-            setPermissionDenied(true);
-            setIsDetecting(false);
-          },
-          { timeout: 5000 }
-        );
-      } else {
-        setIsDetecting(false);
-      }
-    }
+    // Always attempt auto-detection when modal opens
+    detectLocation();
     setTimeout(() => inputRef.current?.focus(), 300);
-  }, [initialCity]);
+  }, []);
 
   const filtered = query.trim()
     ? cities.filter(c => c.toLowerCase().includes(query.toLowerCase()))
@@ -123,14 +159,27 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 onClick={() => onSelect(detectedCity)}
-                className="mt-3 w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 transition-colors text-left cursor-pointer border border-white/20"
+                className="mt-3 w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-[#C85A32] text-white hover:bg-[#b04a25] transition-colors text-left cursor-pointer border border-white/20 shadow-md"
               >
-                <Locate className="w-4 h-4 text-[#D9A05B] shrink-0" />
-                <div>
-                  <div className="text-sm font-semibold">{detectedCity}</div>
-                  <div className="text-xs text-white/60">Detected near you • Tap to select</div>
+                <Locate className="w-4 h-4 text-white shrink-0 animate-pulse" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold truncate">{detectedCity}</div>
+                  <div className="text-xs text-white/80">Detected from your location • Tap to use</div>
                 </div>
+                <span className="text-[11px] font-bold bg-white text-[#C85A32] px-2 py-0.5 rounded-full shrink-0">
+                  Select
+                </span>
               </motion.button>
+            )}
+            {!isDetecting && !detectedCity && (
+              <button
+                type="button"
+                onClick={detectLocation}
+                className="mt-3 w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 transition-colors text-white text-xs font-semibold cursor-pointer border border-white/20 active:scale-98"
+              >
+                <Locate className="w-4 h-4 text-[#D9A05B]" />
+                <span>{permissionDenied ? 'Permission denied • Tap to retry GPS' : 'Auto-Detect Current City'}</span>
+              </button>
             )}
           </AnimatePresence>
         </div>

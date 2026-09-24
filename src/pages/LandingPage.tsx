@@ -256,21 +256,46 @@ export const LandingPage: React.FC = () => {
   };
 
   const handleDetectLocation = () => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) return;
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        let detected = '';
+
         try {
           const resp = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
           );
-          const data = await resp.json();
-          const city = data.address?.city || data.address?.town || data.address?.state_district || '';
-          if (city) {
-            setSearchCity(city);
-            handleLocationSelect(city);
+          if (resp.ok) {
+            const data = await resp.json();
+            const raw = data.city || data.locality || data.principalSubdivision || '';
+            if (raw) detected = raw.replace(/\s*(Suburban|Urban|District|Division|Metropolitan|Region)\s*/gi, '').trim();
           }
         } catch {}
-      });
-    }
+
+        if (!detected) {
+          try {
+            const resp = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`
+            );
+            if (resp.ok) {
+              const data = await resp.json();
+              const addr = data.address || {};
+              const raw = addr.city || addr.town || addr.state_district || addr.district || addr.county || addr.suburb || '';
+              if (raw) detected = raw.replace(/\s*(Suburban|Urban|District|Division|Metropolitan|Region)\s*/gi, '').trim();
+            }
+          } catch {}
+        }
+
+        if (detected) {
+          setSearchCity(detected);
+          handleLocationSelect(detected);
+        }
+      },
+      () => {},
+      { timeout: 9000, enableHighAccuracy: true, maximumAge: 60000 }
+    );
   };
 
   const [allPhotographersList, setAllPhotographersList] = useState<Photographer[]>([]);

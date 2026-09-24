@@ -241,6 +241,41 @@ export default function App() {
     );
   }
 
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      if (typeof window === 'undefined') return null;
+      const stored = localStorage.getItem('mtshoots_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const syncUser = () => {
+      try {
+        const stored = localStorage.getItem('mtshoots_user');
+        setCurrentUser(stored ? JSON.parse(stored) : null);
+      } catch {
+        setCurrentUser(null);
+      }
+    };
+    window.addEventListener('storage', syncUser);
+    window.addEventListener('mtshoots-auth-changed', syncUser);
+    return () => {
+      window.removeEventListener('storage', syncUser);
+      window.removeEventListener('mtshoots-auth-changed', syncUser);
+    };
+  }, []);
+
+  const userBookingsCount = React.useMemo(() => {
+    if (!currentUser?.email) return 0;
+    const email = currentUser.email.toLowerCase();
+    return (bookings || []).filter(b => String(b.artDirectorEmail || '').toLowerCase() === email).length;
+  }, [bookings, currentUser]);
+
+  const userShortlistCount = currentUser ? (shortlistIds || []).length : 0;
+
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#181615] selection:bg-[#C85A32]/20 selection:text-[#C85A32]">
       <ScrollToTop />
@@ -256,8 +291,8 @@ export default function App() {
 
       {/* Global PWA Mobile Bottom Nav */}
       <PwaNav
-        bookingCount={bookings.length}
-        shortlistCount={shortlistIds.length}
+        bookingCount={userBookingsCount}
+        shortlistCount={userShortlistCount}
         onOpenNewBooking={openNewBooking}
       />
 
@@ -271,7 +306,12 @@ export default function App() {
       {showLocationPicker && (
         <LocationPickerModal
           onSelect={handleLocationSelect}
-          onDismiss={() => setShowLocationPicker(false)}
+          onDismiss={() => {
+            setShowLocationPicker(false);
+            if (!localStorage.getItem('mtshoots_city')) {
+              localStorage.setItem('mtshoots_city', 'All India');
+            }
+          }}
           initialCity={selectedCity}
         />
       )}
