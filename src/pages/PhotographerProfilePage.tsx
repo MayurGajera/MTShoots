@@ -9,7 +9,7 @@ import {
   Sliders, ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { INITIAL_PHOTOGRAPHERS, AVAILABLE_ADDONS, getAllPhotographers } from '../data/photographers';
+import { AVAILABLE_ADDONS } from '../data/photographers';
 import { getPhotographerById } from '../lib/supabase';
 import { ApertureLoader } from '../components/ApertureLoader';
 import { Photographer, PortfolioItem, ShootDurationType, UsageRightsTier } from '../types';
@@ -44,58 +44,24 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [photographer, setPhotographer] = useState<Photographer | null>(() => {
-    const normalizedId = id ? decodeURIComponent(id) : '';
-    const all = getAllPhotographers();
-    const localMatch = all.find(p => p.id === id || p.id === normalizedId || (id && p.id?.includes(id)));
-    if (localMatch) return localMatch;
-
-    try {
-      const raw = typeof window !== 'undefined' ? localStorage.getItem('mtshoots_photographer_profile') : null;
-      if (!raw) return null;
-      const saved = JSON.parse(raw) as Photographer | null;
-      if (saved && (saved.id === id || saved.id === normalizedId || (id && saved.id?.includes(id)))) {
-        return saved;
-      }
-    } catch {
-      // ignore malformed cached data
-    }
-
-    return null;
-  });
-  const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(!photographer);
+  const [photographer, setPhotographer] = useState<Photographer | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(true);
 
   useEffect(() => {
     let isMounted = true;
-    const normalizedId = id ? decodeURIComponent(id) : '';
-    const local = getAllPhotographers().find(p => p.id === id || p.id === normalizedId || (id && p.id?.includes(id)));
-    if (local) {
-      setPhotographer(local);
-      setIsLoadingProfile(false);
-    } else {
-      try {
-        const raw = typeof window !== 'undefined' ? localStorage.getItem('mtshoots_photographer_profile') : null;
-        if (raw) {
-          const saved = JSON.parse(raw) as Photographer | null;
-          if (saved && (saved.id === id || saved.id === normalizedId || (id && saved.id?.includes(id)))) {
-            setPhotographer(saved);
-            setIsLoadingProfile(false);
-          }
-        }
-      } catch {
-        // ignore malformed cached data
-      }
-    }
-
     async function loadRemoteProfile() {
-      if (!id) return;
+      if (!id) {
+        setIsLoadingProfile(false);
+        return;
+      }
+      setIsLoadingProfile(true);
       try {
         const remote = await getPhotographerById(id);
-        if (isMounted && remote) {
+        if (isMounted) {
           setPhotographer(remote);
         }
       } catch (err) {
-        console.warn('Error fetching remote photographer profile:', err);
+        console.warn('Error fetching remote photographer profile from Supabase:', err);
       } finally {
         if (isMounted) setIsLoadingProfile(false);
       }

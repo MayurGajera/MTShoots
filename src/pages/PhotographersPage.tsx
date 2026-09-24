@@ -3,7 +3,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link, useNavigate } from '@/lib/navigation';
 import { Search, ArrowLeft, Calendar as CalendarIcon, X, Camera, ShieldCheck } from 'lucide-react';
 import { Photographer, PortfolioItem } from '../types';
-import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
 import { isSupabaseConfigured, loadPhotographers } from '../lib/supabase';
 import { FilterBar, BudgetRangeType, ExperienceLevelFilterType, SortOptionType } from '../components/FilterBar';
 import { CategoryFlowBar } from '../components/CategoryFlowBar';
@@ -40,21 +39,19 @@ export const PhotographersPage: React.FC = () => {
     }).catch(() => {});
   }, []);
 
-  // Photographers data - load dynamic photographers from Supabase DB with fallback
-  const [photographers, setPhotographers] = useState<Photographer[]>(() => getAllPhotographers());
-  const [isLoading, setIsLoading] = useState<boolean>(() => getAllPhotographers().length === 0);
+  // Photographers data - load dynamic photographers exclusively from Supabase DB
+  const [photographers, setPhotographers] = useState<Photographer[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Load photographers from Supabase DB
   useEffect(() => {
     let isMounted = true;
     async function load() {
-      if (getAllPhotographers().length === 0) {
-        setIsLoading(true);
-      }
+      setIsLoading(true);
       try {
         const remote = await loadPhotographers();
-        if (isMounted && remote && remote.length > 0) {
-          setPhotographers(remote);
+        if (isMounted) {
+          setPhotographers(remote || []);
         }
       } catch (err) {
         console.warn('Error loading photographers from Supabase:', err);
@@ -156,10 +153,12 @@ export const PhotographersPage: React.FC = () => {
   // Keep this page's city filter scoped to the results page only.
   // Do not overwrite the page selection from global app-level city changes.
 
-  // Keep synced with registered photographers storage events
+  // Keep synced with registered photographers events by refetching from DB
   useEffect(() => {
     const handleUpdate = () => {
-      setPhotographers(getAllPhotographers());
+      loadPhotographers().then(remote => {
+        if (remote && remote.length > 0) setPhotographers(remote);
+      }).catch(() => {});
     };
     window.addEventListener('photographers-updated', handleUpdate);
     return () => window.removeEventListener('photographers-updated', handleUpdate);

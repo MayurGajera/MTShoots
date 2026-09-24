@@ -12,7 +12,6 @@ import { Footer } from '../components/Footer';
 import { MTShootsLogo } from '../components/MTShootsLogo';
 import { PhotographerCard } from '../components/PhotographerCard';
 import { Photographer } from '../types';
-import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
 import { loadPhotographers, isSupabaseConfigured } from '../lib/supabase';
 import { fetchCategories, fetchTestimonials } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
@@ -241,21 +240,21 @@ export const LandingPage: React.FC = () => {
     }
   };
 
-  const [allPhotographersList, setAllPhotographersList] = useState<Photographer[]>(() => getAllPhotographers());
+  const [allPhotographersList, setAllPhotographersList] = useState<Photographer[]>([]);
 
   useEffect(() => {
     const handleUpdate = () => {
-      setAllPhotographersList(getAllPhotographers());
+      loadPhotographers().then((remote) => {
+        if (remote) setAllPhotographersList(remote);
+      }).catch(() => {});
     };
     window.addEventListener('photographers-updated', handleUpdate);
 
-    if (isSupabaseConfigured()) {
-      loadPhotographers().then((remote) => {
-        if (remote && remote.length > 0) {
-          setAllPhotographersList(remote);
-        }
-      }).catch(() => {});
-    }
+    loadPhotographers().then((remote) => {
+      if (remote) {
+        setAllPhotographersList(remote);
+      }
+    }).catch(() => {});
 
     return () => window.removeEventListener('photographers-updated', handleUpdate);
   }, []);

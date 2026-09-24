@@ -9,13 +9,21 @@ import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { ScrollToTopButton } from '@/components/ScrollToTopButton';
 import { LocationPickerModal } from '@/components/LocationPickerModal';
 import { BookingSheetModal } from '@/components/BookingSheetModal';
-import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '@/data/photographers';
+import { loadPhotographers } from '@/lib/supabase';
+import { Photographer } from '@/types';
 import { ApertureLoader } from '@/components/ApertureLoader';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 function InnerShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const isPolicyPage = pathname === '/privacy' || pathname === '/terms' || pathname === '/cancellation';
+  const [photographersList, setPhotographersList] = useState<Photographer[]>([]);
+
+  useEffect(() => {
+    loadPhotographers().then(remote => {
+      if (remote) setPhotographersList(remote);
+    }).catch(() => {});
+  }, []);
 
   const {
     bookings,
@@ -99,7 +107,7 @@ function InnerShell({ children }: { children: React.ReactNode }) {
       {isBookingModalOpen && (
         <BookingSheetModal
           initialConfig={bookingConfig}
-          photographers={getAllPhotographers()}
+          photographers={photographersList}
           onClose={() => {
             setIsBookingModalOpen(false);
             setBookingConfig(null);

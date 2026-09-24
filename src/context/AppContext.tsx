@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { BookingRequest, Photographer, ShootDurationType, UsageRightsTier } from '@/types';
-import { INITIAL_BOOKINGS, INITIAL_PHOTOGRAPHERS } from '@/data/photographers';
+import { INITIAL_BOOKINGS } from '@/data/photographers';
 import { isSupabaseConfigured, saveBookingToSupabase, fetchBookings } from '@/lib/supabase';
 
 export interface BookingConfig {

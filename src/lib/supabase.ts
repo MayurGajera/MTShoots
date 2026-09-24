@@ -1,6 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Photographer, BookingRequest } from '../types';
-import { INITIAL_PHOTOGRAPHERS, INITIAL_BOOKINGS, getAllPhotographers, getStoredRegisteredPhotographers } from '../data/photographers';
 
 // Environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -217,18 +216,25 @@ export async function testSupabaseConnection(): Promise<{
 }
 
 /**
- * Load Photographers from Supabase with graceful fallback
+/**
+ * Load Photographers exclusively from Supabase database
  */
 export async function loadPhotographers(): Promise<Photographer[]> {
   const client = getSupabaseClient();
   if (!client) {
-    return getAllPhotographers();
+    console.warn('Supabase client unavailable');
+    return [];
   }
 
   try {
-    const { data, error } = await client.from('photographers').select('*');
+    const { data, error } = await client
+      .from('photographers')
+      .select('*')
+      .order('rating', { ascending: false });
+
     if (error || !data || data.length === 0) {
-      return getAllPhotographers();
+      if (error) console.warn('Supabase loadPhotographers error:', error.message);
+      return [];
     }
 
     // Map database snake_case columns to TypeScript camelCase
@@ -264,18 +270,10 @@ export async function loadPhotographers(): Promise<Photographer[]> {
       portfolio: row.portfolio || []
     }));
 
-    // Merge with any locally stored registered photographers so new profiles always appear
-    const localRegistered = getStoredRegisteredPhotographers();
-    const combined = [...remoteList];
-    for (const local of localRegistered) {
-      if (!combined.some(c => c.id === local.id)) {
-        combined.unshift(local);
-      }
-    }
-    return combined.length > 0 ? combined : getAllPhotographers();
+    return remoteList;
   } catch (err) {
-    console.warn('Failed to fetch photographers from Supabase, falling back to all local:', err);
-    return getAllPhotographers();
+    console.warn('Failed to fetch photographers from Supabase:', err);
+    return [];
   }
 }
 
@@ -294,7 +292,7 @@ export async function savePhotographerToSupabase(photographer: Photographer): Pr
       base_city: photographer.baseCity || photographer.location?.split(',')[0]?.trim() || 'Mumbai',
       office_location: photographer.officeLocation || null,
       office_address: photographer.officeAddress || null,
-      office_map_url: photographer.officeMapUrl || null,
+      officeMapUrl: photographer.officeMapUrl || null,
       avatar: photographer.avatar,
       hero_image: photographer.heroImage || photographer.coverImage || photographer.portfolio?.[0]?.imageUrl || photographer.avatar,
       primary_category: photographer.primaryCategory || photographer.specialties?.[0] || 'Commercial & Advertising',
@@ -335,10 +333,7 @@ export async function savePhotographerToSupabase(photographer: Photographer): Pr
 }
 
 /**
- * Fetch a single Photographer by ID or Slug with fallback
- */
-/**
- * Fetch a single Photographer by ID or Slug from Supabase DB with safe fallback
+ * Fetch a single Photographer by ID or Slug from Supabase DB
  */
 export async function getPhotographerById(id: string): Promise<Photographer | null> {
   const client = getSupabaseClient();
@@ -388,10 +383,7 @@ export async function getPhotographerById(id: string): Promise<Photographer | nu
     }
   }
 
-  // Fallback to local memory and registered profiles
-  const localList = getAllPhotographers();
-  const localMatch = localList.find(p => p.id === id || p.id === decodeURIComponent(id));
-  return localMatch || null;
+  return null;
 }
 
 /**

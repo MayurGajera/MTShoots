@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { LandingPage } from './pages/LandingPage';
@@ -18,9 +18,9 @@ import { LocationPickerModal } from './components/LocationPickerModal';
 import { ScrollToTop } from './components/ScrollToTop';
 import { ScrollToTopButton } from './components/ScrollToTopButton';
 import { ApertureLoader } from './components/ApertureLoader';
-import { INITIAL_PHOTOGRAPHERS, INITIAL_BOOKINGS, getAllPhotographers } from './data/photographers';
+import { INITIAL_BOOKINGS } from './data/photographers';
 import { BookingRequest, Photographer, ShootDurationType, UsageRightsTier } from './types';
-import { isSupabaseConfigured, saveBookingToSupabase } from './lib/supabase';
+import { isSupabaseConfigured, saveBookingToSupabase, loadPhotographers } from './lib/supabase';
 import { useScrollLock } from './hooks/useScrollLock';
 
 // Page transitions variant
@@ -74,7 +74,7 @@ function AnimatedRoutes({
           <Route path="/bookings" element={
             <BookingsPage
               bookings={bookings}
-              photographers={getAllPhotographers()}
+              photographers={[]}
               onOpenNewBooking={openNewBooking}
             />
           } />
@@ -122,6 +122,13 @@ export default function App() {
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isAppLoading, setIsAppLoading] = useState(true);
+  const [photographersList, setPhotographersList] = useState<Photographer[]>([]);
+
+  useEffect(() => {
+    loadPhotographers().then(r => {
+      if (r) setPhotographersList(r);
+    }).catch(() => {});
+  }, []);
 
   // Lock body scroll when booking modal is open
   useScrollLock(isBookingModalOpen);
@@ -235,7 +242,7 @@ export default function App() {
       {isBookingModalOpen && (
         <BookingSheetModal
           initialConfig={bookingConfig}
-          photographers={getAllPhotographers()}
+          photographers={photographersList}
           onClose={() => { setIsBookingModalOpen(false); setBookingConfig(null); }}
           onConfirmBooking={handleConfirmBooking}
         />
