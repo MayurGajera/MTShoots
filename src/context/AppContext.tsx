@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { BookingRequest, Photographer, ShootDurationType, UsageRightsTier } from '@/types';
-import { INITIAL_BOOKINGS, INITIAL_PHOTOGRAPHERS } from '@/data/photographers';
 import { isSupabaseConfigured, saveBookingToSupabase, fetchBookings } from '@/lib/supabase';
 
 export interface BookingConfig {
@@ -18,6 +17,7 @@ export interface BookingConfig {
 interface AppContextType {
   bookings: BookingRequest[];
   setBookings: React.Dispatch<React.SetStateAction<BookingRequest[]>>;
+  isBookingsLoading: boolean;
   shortlistIds: string[];
   setShortlistIds: React.Dispatch<React.SetStateAction<string[]>>;
   onToggleSave: (id: string) => void;
@@ -41,14 +41,15 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [bookings, setBookings] = useState<BookingRequest[]>(() => {
-    if (typeof window === 'undefined') return INITIAL_BOOKINGS || [];
+    if (typeof window === 'undefined') return [];
     try {
       const saved = localStorage.getItem('capturely_bookings');
-      return saved ? JSON.parse(saved) : (INITIAL_BOOKINGS || []);
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_BOOKINGS || [];
+      return [];
     }
   });
+  const [isBookingsLoading, setIsBookingsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -60,6 +61,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.warn('Could not load remote bookings from Supabase:', err);
+      } finally {
+        if (isMounted) {
+          setIsBookingsLoading(false);
+        }
       }
     }
     loadDbBookings();
@@ -69,14 +74,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return ['darshan-mehta', 'rohan-varma'];
+    if (typeof window === 'undefined') return [];
     try {
+      const user = localStorage.getItem('mtshoots_user');
+      if (!user) return [];
       const saved = localStorage.getItem('capturely_shortlist');
-      return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return ['darshan-mehta', 'rohan-varma'];
+      return [];
     }
   });
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      try {
+        const user = localStorage.getItem('mtshoots_user');
+        if (!user) {
+          setShortlistIds([]);
+          return;
+        }
+        const saved = localStorage.getItem('capturely_shortlist');
+        setShortlistIds(saved ? JSON.parse(saved) : []);
+      } catch {
+        setShortlistIds([]);
+      }
+    };
+    window.addEventListener('storage', handleAuthChange);
+    window.addEventListener('mtshoots-auth-changed', handleAuthChange);
+    return () => {
+      window.removeEventListener('storage', handleAuthChange);
+      window.removeEventListener('mtshoots-auth-changed', handleAuthChange);
+    };
+  }, []);
 
   const [selectedCity, setSelectedCity] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
@@ -146,7 +175,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const isUserSignedIn = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return !!localStorage.getItem('mtshoots_user');
+    } catch {
+      return false;
+    }
+  };
+
   const onToggleSave = (id: string) => {
+    if (!isUserSignedIn()) {
+      triggerToast('Please sign in to save photographers');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth';
+      }
+      return;
+    }
     const next = shortlistIds.includes(id)
       ? shortlistIds.filter(x => x !== id)
       : [...shortlistIds, id];
@@ -166,11 +211,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const openBooking = (config: BookingConfig | null) => {
+    if (!isUserSignedIn()) {
+      triggerToast('Please sign in to book a photoshoot');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth';
+      }
+      return;
+    }
     setBookingConfig(config);
     setIsBookingModalOpen(true);
   };
 
   const openNewBooking = () => {
+    if (!isUserSignedIn()) {
+      triggerToast('Please sign in to book a photoshoot');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth';
+      }
+      return;
+    }
     setBookingConfig(null);
     setIsBookingModalOpen(true);
   };
@@ -189,7 +248,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         bookings,
         setBookings,
-        shortlistIds,
+        isBookingsLoading,
+        shortlistIds: isUserSignedIn() ? shortlistIds : [],
         setShortlistIds,
         onToggleSave,
         selectedCity,
@@ -216,6 +276,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 const defaultAppContext: AppContextType = {
   bookings: [],
   setBookings: () => {},
+  isBookingsLoading: false,
   shortlistIds: [],
   setShortlistIds: () => {},
   onToggleSave: () => {},

@@ -26,17 +26,20 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  // Build slider images from homeSliderPhotos, fallback to heroImage + portfolio items
+  // Build slider images combining all available portfolio images and slider photos
   const sliderImages: string[] = React.useMemo(() => {
     const rawList: string[] = [];
+
+    // Prioritize uploaded portfolio images so all 3-4 images appear in card slider
+    if (photographer.portfolio && photographer.portfolio.length > 0) {
+      rawList.push(...photographer.portfolio.map(p => p.imageUrl));
+    }
     if (photographer.homeSliderPhotos && photographer.homeSliderPhotos.length > 0) {
       rawList.push(...photographer.homeSliderPhotos);
-    } else {
-      if (photographer.heroImage) rawList.push(photographer.heroImage);
-      if (photographer.portfolio && photographer.portfolio.length > 0) {
-        rawList.push(...photographer.portfolio.map(p => p.imageUrl));
-      }
     }
+    if (photographer.heroImage) rawList.push(photographer.heroImage);
+    if (photographer.coverImage) rawList.push(photographer.coverImage);
+
     const seen = new Set<string>();
     const result: string[] = [];
     for (const img of rawList) {
@@ -45,7 +48,7 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
         result.push(img);
       }
     }
-    return result.length > 0 ? result : [photographer.heroImage];
+    return result.length > 0 ? result : [photographer.heroImage || photographer.avatar];
   }, [photographer]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -127,12 +130,12 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
   return (
     <motion.article
       id={`photographer-card-${photographer.id}`}
-      whileHover={{ y: -6, transition: { duration: 0.22, ease: 'easeOut' } }}
-      className="group bg-white rounded-3xl border border-[#E7E1DA] overflow-hidden flex flex-col transition-shadow duration-300 hover:shadow-2xl hover:border-[#dec0b7]"
+      whileHover={{ y: -4, transition: { duration: 0.22, ease: 'easeOut' } }}
+      className="group bg-white rounded-2xl border border-[#E7E1DA] overflow-hidden flex flex-col transition-shadow duration-300 hover:shadow-xl hover:border-[#dec0b7]"
     >
       {/* ── Image Slider ── */}
       <div
-        className="relative aspect-[4/5] sm:aspect-[3/4] w-full overflow-hidden bg-[#181615] cursor-pointer select-none"
+        className="relative aspect-[4/4.8] w-full overflow-hidden bg-[#181615] cursor-pointer select-none"
         onClick={handleCardNavigate}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -198,64 +201,81 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
         )}
 
         {/* ── Top Bar: Availability + Save ── */}
-        <div className="absolute top-3.5 inset-x-3.5 z-20 flex items-center justify-between pointer-events-none">
+        <div className="absolute top-3 inset-x-3 z-20 flex items-center justify-between pointer-events-none">
           {photographer.availableNow ? (
-            <span className="pointer-events-auto inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#EAF4ED]/95 backdrop-blur-md text-[#2D593E] shadow-sm border border-[#D1E6D6]">
+            <span className="pointer-events-auto inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#EAF4ED]/95 backdrop-blur-md text-[#2D593E] shadow-sm border border-[#D1E6D6]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#4A7C59] animate-pulse" />
               <span>Available Now</span>
             </span>
           ) : (
-            <span className="pointer-events-auto inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#FBF3E8]/95 backdrop-blur-md text-[#8C531B] shadow-sm border border-[#E7E1DA]">
+            <span className="pointer-events-auto inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FBF3E8]/95 backdrop-blur-md text-[#8C531B] shadow-sm border border-[#E7E1DA]">
               <Clock className="w-3 h-3" />
               <span>From {photographer.nextAvailableDate}</span>
             </span>
           )}
 
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onToggleSave(photographer.id); }}
-            title={isSaved ? 'Remove from Saved' : 'Save Photographer'}
-            className={`pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-md transition-all cursor-pointer shadow-md ${
-              isSaved ? 'bg-[#C85A32] text-white scale-105' : 'bg-black/40 text-white hover:bg-black/60 hover:scale-105'
-            }`}
-          >
-            <Heart className={`w-4 h-4 transition-transform ${isSaved ? 'fill-current' : ''}`} />
-          </button>
+          {(() => {
+            const isUserSignedIn = () => {
+              try {
+                if (typeof window === 'undefined') return false;
+                return !!localStorage.getItem('mtshoots_user');
+              } catch {
+                return false;
+              }
+            };
+            const isActuallySaved = Boolean(isSaved && isUserSignedIn());
+
+            const handleHeartClick = (e: React.MouseEvent) => {
+              e.stopPropagation();
+              if (!isUserSignedIn()) {
+                navigate('/auth');
+                return;
+              }
+              onToggleSave(photographer.id);
+            };
+
+            return (
+              <button
+                type="button"
+                onClick={handleHeartClick}
+                title={isActuallySaved ? 'Remove from Saved' : 'Save Photographer'}
+                className={`pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all cursor-pointer shadow-md ${
+                  isActuallySaved ? 'bg-[#C85A32] text-white scale-105' : 'bg-black/40 text-white hover:bg-black/60 hover:scale-105'
+                }`}
+              >
+                <Heart className={`w-3.5 h-3.5 transition-transform ${isActuallySaved ? 'fill-current' : ''}`} />
+              </button>
+            );
+          })()}
         </div>
 
         {/* ── Bottom: Location + Rating ── */}
-        <div className="absolute bottom-3.5 inset-x-3.5 z-20 text-white flex items-end justify-between">
-          <div>
-            <div className="flex items-center space-x-1.5 text-xs text-white/95 font-medium">
-              <MapPin className="w-3.5 h-3.5 text-[#C85A32]" />
-              <span>{photographer.location}</span>
-            </div>
-            <div className="text-[11px] text-white/70 mt-0.5 tracking-wider uppercase font-semibold">
-              {photographer.cameraFormat}
-            </div>
+        <div className="absolute bottom-2.5 inset-x-2.5 z-20 text-white flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-[10px] text-white/95 font-medium truncate max-w-[62%]">
+            <MapPin className="w-3 h-3 text-[#C85A32] shrink-0" />
+            <span className="truncate">{photographer.location}</span>
           </div>
 
-          <div className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-sm text-xs text-white font-medium">
-            <Star className="w-3.5 h-3.5 text-[#D9A05B] fill-[#D9A05B]" />
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/35 backdrop-blur-sm text-[10px] text-white font-medium shrink-0">
+            <Star className="w-3 h-3 text-[#D9A05B] fill-[#D9A05B]" />
             <span className="font-bold">{photographer.rating}</span>
-            <span className="text-white/60 text-[11px]">({photographer.reviewCount})</span>
           </div>
         </div>
       </div>
 
       {/* ── Card Body ── */}
-      <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-4">
+      <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between space-y-3">
         <div>
           {/* Badges */}
-          <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+          <div className="flex flex-wrap items-center gap-1 mb-2">
             {photographer.primaryCategory && (
-              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#fbf2ee] text-[#C85A32] border border-[#dec0b7]">
-                <Camera className="w-3 h-3" />
+              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#fbf2ee] text-[#C85A32] border border-[#dec0b7]">
+                <Camera className="w-2.5 h-2.5" />
                 <span>{photographer.primaryCategory}</span>
               </span>
             )}
-            <span className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${expBadge.className}`}>
-              <Award className="w-3 h-3" />
+            <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${expBadge.className}`}>
+              <Award className="w-2.5 h-2.5" />
               <span>{expBadge.label}</span>
             </span>
           </div>
@@ -264,50 +284,52 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
           <div className="flex items-baseline justify-between gap-2">
             <Link
               to={`/photographers/${photographer.id}`}
-              className="font-serif text-xl font-bold text-[#181615] hover:text-[#C85A32] transition-colors leading-tight"
+              className="font-serif text-lg font-bold text-[#181615] hover:text-[#C85A32] transition-colors leading-tight"
             >
               {photographer.name}
             </Link>
-            <div className="flex items-center text-xs text-[#4A7C59] font-semibold shrink-0" title="Verified Photographer">
-              <ShieldCheck className="w-4 h-4 mr-0.5" />
+            <div className="flex items-center text-[10px] text-[#4A7C59] font-semibold shrink-0" title="Verified Photographer">
+              <ShieldCheck className="w-3.5 h-3.5 mr-0.5" />
               <span>Verified</span>
             </div>
           </div>
 
           {/* Short bio */}
-          <p className="mt-2 text-xs text-[#57423b] line-clamp-2 leading-relaxed">
+          <p className="mt-1.5 text-[11px] text-[#57423b] line-clamp-2 leading-relaxed">
             {photographer.bio}
           </p>
         </div>
 
         {/* ── Price + Action ── */}
-        <div className="pt-3.5 border-t border-[#E7E1DA] flex items-center justify-between">
-          <div>
-            <span className="text-[10px] uppercase tracking-wider text-[#8a726a] font-bold block">
-              Starting from
+        <div className="pt-2 border-t border-[#E7E1DA] mt-1 flex items-end justify-between gap-2 sm:gap-3">
+          <div className="min-w-0 flex flex-col justify-center overflow-hidden">
+            <span className="text-[7px] uppercase tracking-[0.14em] text-[#8a726a] font-bold leading-none whitespace-nowrap">
+              STARTING FROM
             </span>
-            <span className="text-lg font-bold text-[#181615] tabular-nums font-sans">
-              {formatINR(photographer.dayRate)}
-              <span className="text-xs font-normal text-[#8a726a]"> /day</span>
-            </span>
+            <div className="mt-1 flex items-end gap-1.5 min-w-0 whitespace-nowrap">
+              <span className="text-[11px] sm:text-[12px] md:text-[13px] font-bold text-[#181615] tabular-nums font-sans leading-none">
+                {formatINR(photographer.dayRate)}
+              </span>
+              <span className="text-[8px] font-medium text-[#8a726a] leading-none whitespace-nowrap">/day</span>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <Button
               id={`book-photographer-${photographer.id}`}
               variant="terracotta"
               size="sm"
               onClick={() => onQuickBook(photographer)}
-              className="text-xs font-bold px-3.5 cursor-pointer hover:scale-[1.03] transition-transform shadow-sm"
+              className="text-[9px] sm:text-[10px] font-bold px-2.5 sm:px-3 py-1.5 sm:py-2 cursor-pointer hover:scale-[1.02] transition-transform shadow-sm"
             >
               Book Now
             </Button>
             <Link
               to={`/photographers/${photographer.id}`}
-              className="h-8 w-8 rounded-full border border-[#E7E1DA] flex items-center justify-center text-[#181615] hover:bg-[#F4EFEB] hover:border-[#C85A32] transition-all cursor-pointer"
+              className="h-7 w-7 sm:h-8 sm:w-8 rounded-full border border-[#E7E1DA] flex items-center justify-center text-[#181615] hover:bg-[#F4EFEB] hover:border-[#C85A32] transition-all cursor-pointer"
               title="View full profile"
             >
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Link>
           </div>
         </div>

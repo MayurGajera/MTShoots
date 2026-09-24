@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from '@/lib/navigation';
 import { motion } from 'motion/react';
 import { Navbar } from '../components/Navbar';
@@ -8,8 +8,9 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { saveRegisteredPhotographer } from '../data/photographers';
 import { AvatarPicker } from '../components/AvatarPicker';
-import { savePhotographerToSupabase, upsertUser } from '../lib/supabase';
+import { savePhotographerToSupabase, upsertUser, deleteSupabaseStorageFileByUrl } from '../lib/supabase';
 import { Photographer, Package, PortfolioItem } from '../types';
+import { compressImageFile } from '../utils/imageCompressor';
 import {
   Camera,
   User,
@@ -24,6 +25,7 @@ import {
   Check,
   ArrowRight,
   ArrowLeft,
+  ChevronDown,
   Image as ImageIcon,
   ShieldCheck,
   Star,
@@ -65,6 +67,43 @@ const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80'
 ];
 
+const MAX_PORTFOLIO_IMAGES = 12;
+const MAX_PORTFOLIO_FILE_SIZE = 15 * 1024 * 1024;
+
+const normalizePortfolioPhoto = (photo: any): UploadedPhoto | null => {
+  if (!photo || typeof photo !== 'object') return null;
+
+  const url = typeof photo.url === 'string' ? photo.url.trim() : '';
+  if (!url) return null;
+
+  if (!/^data:image\//i.test(url) && !/^https?:\/\//i.test(url)) {
+    return null;
+  }
+
+  return {
+    id: typeof photo.id === 'string' ? photo.id : 'photo-' + Date.now(),
+    url,
+    caption: typeof photo.caption === 'string' && photo.caption.trim() ? photo.caption.trim() : 'Portfolio Photo',
+    tag: typeof photo.tag === 'string' ? photo.tag : '',
+    isCover: Boolean(photo.isCover),
+  };
+};
+
+const blockNegativeNumberKeys = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  if (['-', '+', 'e', 'E'].includes(event.key)) {
+    event.preventDefault();
+  }
+};
+
+const sanitizeNonNegativeNumber = (value: string) => {
+  if (value === '') return '';
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return '';
+
+  return Math.max(0, parsed);
+};
+
 const SAMPLE_PORTFOLIO_POOL = [
   'https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&w=1200&q=80',
   'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80',
@@ -88,6 +127,7 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [isSubmittedComingSoon, setIsSubmittedComingSoon] = useState<boolean>(false);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [publishedSlug, setPublishedSlug] = useState<string>('');
 
@@ -103,26 +143,44 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
   const [city, setCity] = useState('');
+  const [hasHydratedDraft, setHasHydratedDraft] = useState(false);
+
+  React.useEffect(() => {
+    if (!isCityDropdownOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const dropdownRoot = document.getElementById('city-dropdown-root');
+
+      if (dropdownRoot && !dropdownRoot.contains(target)) {
+        setIsCityDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isCityDropdownOpen]);
   const [experienceYears, setExperienceYears] = useState<number | ''>('');
   const [startingRate, setStartingRate] = useState<number | ''>('');
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
   // Step 2: Disciplines & Equipment
-  const [primaryGenre, setPrimaryGenre] = useState('Wedding & Pre-Wedding');
-  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>(['Wedding', 'Pre-Wedding']);
-  const [cameraBodies, setCameraBodies] = useState('Sony A7 IV, Canon EOS R5');
-  const [lenses, setLenses] = useState('24-70mm f/2.8 GM, 85mm f/1.4');
-  const [lighting, setLighting] = useState('Profoto B10X, Godox AD200');
-  const [droneGear, setDroneGear] = useState('DJI Mavic 3 Pro');
+  const [primaryGenre, setPrimaryGenre] = useState('');
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
+  const [cameraBodies, setCameraBodies] = useState('');
+  const [lenses, setLenses] = useState('');
+  const [lighting, setLighting] = useState('');
+  const [droneGear, setDroneGear] = useState('');
 
-  // Step 3: Packages & Rates (sensible defaults)
-  const [standardTitle, setStandardTitle] = useState('Full-Day Creative Production');
-  const [standardRate, setStandardRate] = useState<number | ''>(45000);
-  const [standardHours, setStandardHours] = useState<number | ''>(8);
-  const [standardDeliverables, setStandardDeliverables] = useState('40-50 high-res retouched images, online gallery, full usage rights');
-  const [turnaroundDays, setTurnaroundDays] = useState<number | ''>(5);
+  // Step 3: Packages & Rates
+  const [standardTitle, setStandardTitle] = useState('');
+  const [standardRate, setStandardRate] = useState<number | ''>('');
+  const [standardHours, setStandardHours] = useState<number | ''>('');
+  const [standardDeliverables, setStandardDeliverables] = useState('');
+  const [turnaroundDays, setTurnaroundDays] = useState<number | ''>('');
 
   // Validation functions
   const validateStep1 = () => {
@@ -199,79 +257,322 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
   };
 
   // Step 4: Visual Showcase & Multiple Photos
-  const [portfolioPhotos, setPortfolioPhotos] = useState<UploadedPhoto[]>([
-    {
-      id: 'photo-1',
-      url: 'https://images.unsplash.com/photo-1606800052052-a08af7148866?auto=format&fit=crop&w=1200&q=85',
-      caption: 'Heritage Palace Wedding Ceremony',
-      tag: 'Wedding',
-      isCover: true
-    },
-    {
-      id: 'photo-2',
-      url: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1200&q=85',
-      caption: 'Golden Hour Pre-Wedding Portraits',
-      tag: 'Pre-Wedding',
-      isCover: false
-    },
-    {
-      id: 'photo-3',
-      url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=85',
-      caption: 'Fashion Editorial Campaign',
-      tag: 'Fashion',
-      isCover: false
+  const [portfolioPhotos, setPortfolioPhotos] = useState<UploadedPhoto[]>([]);
+  const [advanceDeposit, setAdvanceDeposit] = useState(25);
+  const [acceptsDestination, setAcceptsDestination] = useState(true);
+  const [travelCostPolicy, setTravelCostPolicy] = useState('');
+
+  const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+  const PHOTOGRAPHER_DRAFT_KEY = 'mtshoots_photographer_draft';
+
+  const purgeExpiredDrafts = () => {
+    if (typeof window === 'undefined') return;
+
+    const raw = localStorage.getItem(PHOTOGRAPHER_DRAFT_KEY);
+    if (!raw) return;
+
+    try {
+      const draft = JSON.parse(raw);
+      if (draft?.updatedAt && Date.now() - Number(draft.updatedAt) > DRAFT_TTL_MS) {
+        localStorage.removeItem(PHOTOGRAPHER_DRAFT_KEY);
+      }
+    } catch {
+      localStorage.removeItem(PHOTOGRAPHER_DRAFT_KEY);
     }
-  ]);
+  };
+
+  const saveDraft = () => {
+    if (typeof window === 'undefined') return;
+
+    const safePortfolioPhotos = portfolioPhotos
+      .map((photo) => normalizePortfolioPhoto(photo))
+      .filter((photo): photo is UploadedPhoto => Boolean(photo))
+      .slice(0, MAX_PORTFOLIO_IMAGES)
+      .map((photo) => ({
+        ...photo,
+        url: photo.url && photo.url.length < 200000 ? photo.url : '',
+      }))
+      .filter((photo) => Boolean(photo.url));
+
+    const payload = {
+      currentStep,
+      fullName,
+      brandName,
+      email,
+      phone,
+      password,
+      confirmPassword,
+      city,
+      experienceYears,
+      startingRate,
+      bio,
+      avatarUrl: avatarUrl && avatarUrl.length < 200000 ? avatarUrl : '',
+      primaryGenre,
+      selectedSpecialties,
+      cameraBodies,
+      lenses,
+      lighting,
+      droneGear,
+      standardTitle,
+      standardRate,
+      standardHours,
+      standardDeliverables,
+      turnaroundDays,
+      portfolioPhotos: safePortfolioPhotos,
+      advanceDeposit,
+      travelCostPolicy,
+      updatedAt: Date.now(),
+    };
+
+    try {
+      const serialized = JSON.stringify(payload);
+      if (serialized.length > 2_000_000) {
+        const compactPayload = {
+          ...payload,
+          avatarUrl: '',
+          portfolioPhotos: [],
+        };
+        localStorage.setItem(PHOTOGRAPHER_DRAFT_KEY, JSON.stringify(compactPayload));
+        return;
+      }
+      localStorage.setItem(PHOTOGRAPHER_DRAFT_KEY, serialized);
+    } catch (error) {
+      console.warn('Draft save exceeded browser storage quota. Saving a reduced draft instead.', error);
+      try {
+        localStorage.setItem(
+          PHOTOGRAPHER_DRAFT_KEY,
+          JSON.stringify({
+            ...payload,
+            avatarUrl: '',
+            portfolioPhotos: [],
+            currentStep,
+            fullName,
+            brandName,
+            email,
+            phone,
+            city,
+            experienceYears,
+            startingRate,
+            bio,
+            primaryGenre,
+            selectedSpecialties,
+            cameraBodies,
+            lenses,
+            lighting,
+            droneGear,
+            standardTitle,
+            standardRate,
+            standardHours,
+            standardDeliverables,
+            turnaroundDays,
+            advanceDeposit,
+            travelCostPolicy,
+            updatedAt: Date.now(),
+          })
+        );
+      } catch {
+        // Ignore storage quota errors so the app keeps working.
+      }
+    }
+  };
+
+  const restoreDraft = () => {
+    if (typeof window === 'undefined') return;
+
+    const raw = localStorage.getItem(PHOTOGRAPHER_DRAFT_KEY);
+    if (!raw) return;
+
+    try {
+      const draft = JSON.parse(raw);
+      if (!draft || typeof draft !== 'object') return;
+
+      if (typeof draft.currentStep === 'number') setCurrentStep(draft.currentStep);
+      if (typeof draft.fullName === 'string') setFullName(draft.fullName);
+      if (typeof draft.brandName === 'string') setBrandName(draft.brandName);
+      if (typeof draft.email === 'string') setEmail(draft.email);
+      if (typeof draft.phone === 'string') setPhone(draft.phone);
+      if (typeof draft.password === 'string') setPassword(draft.password);
+      if (typeof draft.confirmPassword === 'string') setConfirmPassword(draft.confirmPassword);
+      if (typeof draft.city === 'string') setCity(draft.city);
+      if (draft.experienceYears !== undefined) setExperienceYears(draft.experienceYears ?? '');
+      if (draft.startingRate !== undefined) setStartingRate(draft.startingRate ?? '');
+      if (typeof draft.bio === 'string') setBio(draft.bio);
+      if (typeof draft.avatarUrl === 'string') setAvatarUrl(draft.avatarUrl);
+      if (typeof draft.primaryGenre === 'string') setPrimaryGenre(draft.primaryGenre);
+      if (Array.isArray(draft.selectedSpecialties)) setSelectedSpecialties(draft.selectedSpecialties);
+      if (typeof draft.cameraBodies === 'string') setCameraBodies(draft.cameraBodies);
+      if (typeof draft.lenses === 'string') setLenses(draft.lenses);
+      if (typeof draft.lighting === 'string') setLighting(draft.lighting);
+      if (typeof draft.droneGear === 'string') setDroneGear(draft.droneGear);
+      if (typeof draft.standardTitle === 'string') setStandardTitle(draft.standardTitle);
+      if (draft.standardRate !== undefined) setStandardRate(draft.standardRate ?? '');
+      if (draft.standardHours !== undefined) setStandardHours(draft.standardHours ?? '');
+      if (typeof draft.standardDeliverables === 'string') setStandardDeliverables(draft.standardDeliverables);
+      if (draft.turnaroundDays !== undefined) setTurnaroundDays(draft.turnaroundDays ?? '');
+      if (Array.isArray(draft.portfolioPhotos)) {
+        const sanitizedPhotos = draft.portfolioPhotos
+          .map((photo: any) => normalizePortfolioPhoto(photo))
+          .filter((photo): photo is UploadedPhoto => Boolean(photo));
+
+        if (sanitizedPhotos.length > 0) {
+          setPortfolioPhotos(sanitizedPhotos);
+        } else {
+          setPortfolioPhotos([]);
+        }
+      }
+      if (draft.advanceDeposit !== undefined) setAdvanceDeposit(draft.advanceDeposit ?? 25);
+      if (typeof draft.travelCostPolicy === 'string') setTravelCostPolicy(draft.travelCostPolicy);
+    } catch {
+      localStorage.removeItem(PHOTOGRAPHER_DRAFT_KEY);
+    }
+  };
 
   const handlePortfolioFilesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    Array.from(files).forEach((file, index) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          const cleanCaption = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-          setPortfolioPhotos(prev => [
-            ...prev,
-            {
-              id: 'photo-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
-              url: reader.result as string,
-              caption: cleanCaption || 'Portfolio Photo',
-              tag: primaryGenre,
-              isCover: prev.length === 0 && index === 0,
-            }
-          ]);
-        }
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    const currentCount = portfolioPhotos.length;
+    const remainingSlots = MAX_PORTFOLIO_IMAGES - currentCount;
+
+    if (remainingSlots <= 0) {
+      setErrors(prev => ({ ...prev, portfolio: `You can upload up to ${MAX_PORTFOLIO_IMAGES} portfolio images total.` }));
+      e.target.value = '';
+      return;
+    }
+
+    const validFiles = files.filter((file) => {
+      if (!file.type.startsWith('image/')) {
+        setErrors(prev => ({ ...prev, portfolio: 'Only image files are allowed in your portfolio.' }));
+        return false;
+      }
+
+      if (file.size > MAX_PORTFOLIO_FILE_SIZE) {
+        setErrors(prev => ({ ...prev, portfolio: `${file.name} is too large. Please keep each image under 15MB.` }));
+        return false;
+      }
+
+      return true;
     });
+
+    if (validFiles.length === 0) {
+      e.target.value = '';
+      return;
+    }
+
+    if (validFiles.length > remainingSlots) {
+      setErrors(prev => ({
+        ...prev,
+        portfolio: `You can add ${remainingSlots} more image${remainingSlots === 1 ? '' : 's'} to this portfolio. Please select fewer files.`
+      }));
+    } else {
+      setErrors(prev => ({ ...prev, portfolio: '' }));
+    }
+
+    const filesToAdd = validFiles.slice(0, remainingSlots);
+
+    // Concurrently compress images to keep storage payload small and prevent QuotaExceededError
+    Promise.all(
+      filesToAdd.map(async (file, index) => {
+        const compressedUrl = await compressImageFile(file, 1200, 0.8);
+        if (!compressedUrl) return null;
+
+        const cleanCaption = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        return {
+          id: 'photo-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5) + '-' + index,
+          url: compressedUrl,
+          caption: cleanCaption || 'Portfolio Photo',
+          tag: primaryGenre,
+          isCover: false,
+        };
+      })
+    ).then((newPhotos) => {
+      const valid = newPhotos.filter((p): p is UploadedPhoto => Boolean(p));
+      if (valid.length > 0) {
+        setPortfolioPhotos(prev => {
+          const hasCover = prev.some(p => p.isCover);
+          const adjusted = valid.map((p, i) => ({
+            ...p,
+            isCover: !hasCover && i === 0
+          }));
+          return [...prev, ...adjusted];
+        });
+      }
+    });
+
+    e.target.value = '';
   };
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [newPhotoCaption, setNewPhotoCaption] = useState('');
 
-  // Step 5: Operations & Availability
-  const [advanceDeposit, setAdvanceDeposit] = useState(25);
-  const [acceptsDestination, setAcceptsDestination] = useState(true);
-  const [travelCostPolicy, setTravelCostPolicy] = useState('Flights & hotel accommodation provided by client');
+  useEffect(() => {
+    purgeExpiredDrafts();
+    restoreDraft();
+    setHasHydratedDraft(true);
+  }, []);
 
-  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    if (!hasHydratedDraft) return;
+    saveDraft();
+  }, [
+    currentStep,
+    fullName,
+    brandName,
+    email,
+    phone,
+    password,
+    confirmPassword,
+    city,
+    experienceYears,
+    startingRate,
+    bio,
+    avatarUrl,
+    primaryGenre,
+    selectedSpecialties,
+    cameraBodies,
+    lenses,
+    lighting,
+    droneGear,
+    standardTitle,
+    standardRate,
+    standardHours,
+    standardDeliverables,
+    turnaroundDays,
+    portfolioPhotos,
+    advanceDeposit,
+    travelCostPolicy,
+    hasHydratedDraft,
+  ]);
+
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setAvatarUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      if (avatarUrl) {
+        await deleteSupabaseStorageFileByUrl(avatarUrl);
+      }
+      const compressed = await compressImageFile(file, 600, 0.82);
+      if (compressed) {
+        setAvatarUrl(compressed);
+      }
     }
   };
 
   const handleAddPhoto = () => {
     if (!newPhotoUrl.trim()) return;
+
+    const closingUrl = newPhotoUrl.trim();
+    const existingMatch = portfolioPhotos.find((photo) => photo.url === closingUrl);
+    if (existingMatch) {
+      setPortfolioPhotos(prev => prev.map((photo) =>
+        photo.id === existingMatch.id ? { ...photo, caption: newPhotoCaption.trim() || photo.caption } : photo
+      ));
+      setNewPhotoUrl('');
+      setNewPhotoCaption('');
+      return;
+    }
+
     const newEntry: UploadedPhoto = {
       id: 'photo-' + Date.now(),
-      url: newPhotoUrl.trim(),
+      url: closingUrl,
       caption: newPhotoCaption.trim() || 'Portfolio Showcase Item',
       tag: primaryGenre,
       isCover: portfolioPhotos.length === 0,
@@ -281,7 +582,11 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
     setNewPhotoCaption('');
   };
 
-  const handleRemovePhoto = (id: string) => {
+  const handleRemovePhoto = async (id: string) => {
+    const photoToDelete = portfolioPhotos.find((p) => p.id === id);
+    if (photoToDelete) {
+      await deleteSupabaseStorageFileByUrl(photoToDelete.url);
+    }
     setPortfolioPhotos(portfolioPhotos.filter((p) => p.id !== id));
   };
 
@@ -296,134 +601,159 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
 
   const handlePublishPhotographer = async () => {
     setIsPublishing(true);
-    const slug = (brandName || fullName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'artist-' + Date.now();
-    const coverPhoto = portfolioPhotos.find((p) => p.isCover)?.url || portfolioPhotos[0]?.url || avatarUrl;
+    localStorage.removeItem(PHOTOGRAPHER_DRAFT_KEY);
+
+    const normalizedName = (brandName || fullName).trim();
+    const slug = normalizedName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'artist-' + Date.now();
+    const uniqueSlug = `${slug}-${Date.now().toString().slice(-6)}`;
+    const coverPhoto = portfolioPhotos.find((p) => p.isCover)?.url || portfolioPhotos[0]?.url || avatarUrl || PRESET_AVATARS[0];
 
     const portfolioItems: PortfolioItem[] = portfolioPhotos.map((p, idx) => ({
-      id: 'port-' + slug + '-' + idx,
-      type: 'image',
-      url: p.url,
-      thumbnailUrl: p.url,
-      title: p.caption,
-      category: p.tag || primaryGenre,
-      clientName: brandName || fullName,
-      year: 2026,
-      featured: p.isCover,
+      id: 'port-' + uniqueSlug + '-' + idx,
+      title: p.caption || `Portfolio Shot ${idx + 1}`,
+      clientOrSeries: normalizedName || fullName || 'Photographer Portfolio',
+      category: p.tag || primaryGenre || 'Photography',
+      imageUrl: p.url,
+      aspectRatio: '4:5',
+      year: String(new Date().getFullYear()),
+      location: city ? `${city}, India` : 'India',
+      techSpecs: `${cameraBodies || 'Professional gear'} • ${lenses || 'Signature lens setup'} • ${primaryGenre || 'Editorial'}`,
+      story: `${normalizedName || fullName || 'Artist'} portfolio feature captured in ${city || 'India'}.`,
     }));
 
-    const packages: Package[] = [
-      {
-        id: 'pkg-' + slug + '-std',
-        name: standardTitle,
-        category: primaryGenre,
-        price: standardRate,
-        durationHours: standardHours,
-        deliverablesCount: 300,
-        turnaroundDays: turnaroundDays,
-        description: standardDeliverables,
-        features: [
-          standardHours + ' Hours on Location',
-          'Full-frame 4K High-Res Capture',
-          'Online Private Gallery Access',
-          'Professional Retouching Included',
-        ],
-        includesDrone: droneGear.length > 0,
-        includesAssistant: true,
-      },
-      {
-        id: 'pkg-' + slug + '-dlx',
-        name: 'Deluxe Multi-Day Comprehensive Coverage',
-        category: primaryGenre,
-        price: Math.round(standardRate * 1.8),
-        durationHours: 16,
-        deliverablesCount: 650,
-        turnaroundDays: turnaroundDays + 2,
-        description: 'Comprehensive 2-day wedding & reception coverage with candid cinema teaser.',
-        features: [
-          '2 Full Days (Up to 16 Total Hours)',
-          'Lead Photographer + Dedicated Lighting Assistant',
-          'Drone Cinematic Aerial Stills',
-          'Express 72-Hour Teaser Delivery',
-        ],
-        includesDrone: true,
-        includesAssistant: true,
-      }
-    ];
-
-    const newPhotographer: Photographer = {
-      id: slug,
-      name: brandName || fullName,
-      avatar: avatarUrl,
+    const photographerProfile: Photographer = {
+      id: uniqueSlug,
+      name: normalizedName || fullName,
+      location: city ? `${city}, India` : 'India',
+      baseCity: city,
+      avatar: avatarUrl || PRESET_AVATARS[0],
+      heroImage: coverPhoto,
       coverImage: coverPhoto,
-      bio: bio || ('Celebrated Indian photographer based in ' + city + ', specializing in bespoke ' + primaryGenre + '. With ' + experienceYears + '+ years of expertise delivering editorial-grade visual narratives.'),
-      tagline: 'Premier ' + primaryGenre + ' Specialist in ' + city,
+      primaryCategory: primaryGenre || 'Wedding Photography',
+      specialties: selectedSpecialties.length ? selectedSpecialties : [primaryGenre || 'Wedding Photography'],
+      experienceLevel: Number(experienceYears) >= 8 ? 'master' : Number(experienceYears) >= 5 ? 'professional' : 'beginner',
+      experienceYears: Number(experienceYears) || 1,
       rating: 4.98,
       reviewCount: 28,
-      location: city + ', India',
-      baseCity: city,
-      experienceYears: Number(experienceYears),
-      experienceLevel: experienceYears >= 8 ? 'Master' : experienceYears >= 5 ? 'Senior' : 'Pro',
-      primaryCategory: primaryGenre,
-      specialties: selectedSpecialties,
-      equipment: [cameraBodies, lenses, lighting, droneGear].filter(Boolean),
-      startingPrice: Number(startingRate),
-      dayRate: Number(standardRate),
-      halfDayRate: Math.round(Number(standardRate) * 0.6),
-      turnaroundDays: Number(turnaroundDays),
-      clientRoster: ['Vogue India', 'Taj Hotels', 'Sabyasachi Brides', 'Zomato', 'Architectural Digest'],
-      verifiedBadge: true,
-      featured: true,
+      dayRate: Number(standardRate) || Number(startingRate) || 45000,
+      halfDayRate: Math.round((Number(standardRate) || Number(startingRate) || 45000) * 0.6),
       availableNow: true,
       nextAvailableDate: new Date().toISOString().split('T')[0],
+      clientRoster: ['Vogue India', 'Taj Hotels', 'Sabyasachi Brides', 'Zomato', 'Architectural Digest'],
+      bio: bio || ('Celebrated Indian photographer based in ' + city + ', specializing in bespoke ' + (primaryGenre || 'photography') + '. With ' + (experienceYears || 1) + '+ years of expertise delivering editorial-grade visual narratives.'),
+      awards: ['Verified Artist', 'Featured on MTShoots'],
+      equipment: [cameraBodies, lenses, lighting, droneGear].filter(Boolean),
+      cameraFormat: `${cameraBodies || 'Professional Camera'} • ${lenses || 'Signature Lens Kit'}`,
+      turnaroundDays: Number(turnaroundDays) || 5,
+      packageTitle: standardTitle || `${primaryGenre || 'Photography'} Signature Package`,
+      advanceDeposit: advanceDeposit || 25,
+      travelPolicy: travelCostPolicy || 'Client covers travel & accommodation for outstation bookings',
+      assistantIncluded: true,
       portfolio: portfolioItems,
-      packages: packages,
-      reviews: [
-        {
-          id: 'rev-' + slug + '-1',
-          clientName: 'Pooja & Siddharth Singhania',
-          clientAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
-          rating: 5,
-          date: 'September 2026',
-          reviewText: 'Outstanding craftsmanship and warmth! Captured every sacred nuance of our royal ceremonies flawlessly.',
-          sessionType: primaryGenre,
-        }
-      ],
-      blackoutDates: [],
+      homeSliderPhotos: portfolioPhotos.length > 0
+        ? portfolioPhotos.map((photo) => photo.url)
+        : [coverPhoto],
+      officeLocation: city ? `${city}, India` : 'India',
+      officeAddress: city ? `${city}, India` : 'India',
+      officeMapUrl: 'https://www.google.com/maps?q=' + encodeURIComponent(city || 'India'),
     };
-
-    await savePhotographerToSupabase(newPhotographer);
-    saveRegisteredPhotographer(newPhotographer);
-    const userObject = {
-      id: 'usr-' + Date.now(),
-      fullName: brandName || fullName,
-      email: email.trim().toLowerCase(),
-      role: 'photographer',
-      photographer_id: slug,
-      phone: phone.trim(),
-      city: city,
-      avatar: avatarUrl || ''
-    };
-    localStorage.setItem('mtshoots_user', JSON.stringify(userObject));
-    localStorage.setItem('mtshoots_photographer_profile', JSON.stringify(newPhotographer));
 
     try {
-      await upsertUser({
-        email: email.trim().toLowerCase(),
-        full_name: brandName || fullName,
-        phone: phone.trim(),
-        avatar_url: avatarUrl,
-        city: city,
-        role: 'photographer',
-        password_hash: password
-      });
-    } catch {}
+      // 1. Immediately persist locally so the newly published artist is accessible in directory
+      saveRegisteredPhotographer(photographerProfile);
 
-    window.dispatchEvent(new CustomEvent('mtshoots-auth-changed'));
-    window.dispatchEvent(new CustomEvent('photographers-updated'));
-    setPublishedSlug(slug);
-    setIsPublishing(false);
-    setShowSuccessModal(true);
+      // Make sure user is NOT logged in automatically and header remains guest view
+      localStorage.removeItem('mtshoots_user');
+      localStorage.removeItem('mtshoots_photographer_profile');
+
+      // 2. Persist to Supabase DB with a safety timeout race so it never blocks or hangs
+      try {
+        await Promise.race([
+          savePhotographerToSupabase(photographerProfile),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase save timeout')), 3500))
+        ]);
+      } catch (dbErr) {
+        console.warn('Supabase DB save note (profile cached locally):', dbErr);
+      }
+
+      try {
+        await Promise.race([
+          upsertUser({
+            email: email.trim().toLowerCase(),
+            full_name: brandName || fullName,
+            phone: phone.trim(),
+            avatar_url: avatarUrl,
+            city: city,
+            role: 'photographer',
+            password_hash: password
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('User upsert timeout')), 2500))
+        ]);
+      } catch {}
+
+      // Notify directory listeners that photographers updated
+      window.dispatchEvent(new CustomEvent('photographers-updated'));
+      setPublishedSlug(uniqueSlug);
+
+      // Smooth loading transition before showing Coming Soon
+      await new Promise(r => setTimeout(r, 600));
+
+      setIsSubmittedComingSoon(true);
+    } catch (err: any) {
+      console.error('Publish photographer error:', err);
+      setIsSubmittedComingSoon(true);
+    } finally {
+      setIsPublishing(false);
+    }
   };
+
+  if (isSubmittedComingSoon) {
+    return (
+      <div className={hideHeader ? "w-full text-[#181615]" : "min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col"}>
+        {!hideHeader && <Navbar />}
+
+        <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-16 sm:py-24">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="bg-white rounded-3xl p-8 sm:p-12 border border-[#E7E1DA] shadow-xl max-w-lg w-full text-center space-y-6"
+          >
+            <div className="w-20 h-20 rounded-full bg-[#fbf2ee] border border-[#dec0b7] text-[#C85A32] flex items-center justify-center mx-auto shadow-inner">
+              <Sparkles className="w-10 h-10 animate-pulse" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#EAF4ED] text-[#2D593E] text-xs font-bold uppercase tracking-wider border border-[#C6E1CD]">
+                MTShoots Verified Network
+              </span>
+              <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#181615]">
+                Coming Soon
+              </h1>
+              <p className="text-sm text-[#8a726a] leading-relaxed max-w-md mx-auto">
+                Thank you for applying. Your photographer application has been received and is being curated. Full public booking access will be available soon.
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-[#E7E1DA]">
+              <Button
+                onClick={() => navigate('/')}
+                className="w-full sm:w-auto min-w-[200px] bg-[#181615] hover:bg-[#C85A32] text-white font-bold text-xs py-3.5 px-8 rounded-full shadow-md transition-all cursor-pointer inline-flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Home</span>
+              </Button>
+            </div>
+          </motion.div>
+        </main>
+
+        {!hideHeader && <Footer />}
+      </div>
+    );
+  }
 
   return (
     <div className={hideHeader ? "w-full text-[#181615]" : "min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col"}>
@@ -620,9 +950,12 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Starting Day Rate (₹ INR) *</label>
                   <Input
                     type="number"
+                    min={0}
                     value={startingRate}
+                    onKeyDown={blockNegativeNumberKeys}
                     onChange={(e) => {
-                      setStartingRate(e.target.value ? Number(e.target.value) : "");
+                      const sanitized = sanitizeNonNegativeNumber(e.target.value);
+                      setStartingRate(sanitized === '' ? '' : Number(sanitized));
                       if (errors.startingRate) setErrors(prev => ({ ...prev, startingRate: "" }));
                     }}
                     placeholder="e.g. 45000"
@@ -633,22 +966,66 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Base Operational City *</label>
-                  <select
-                    value={city}
-                    onChange={(e) => { setCity(e.target.value); if (errors.city) setErrors(prev => ({ ...prev, city: '' })); }}
-                    className={"w-full h-10 px-3 rounded-xl border bg-white text-xs font-medium text-[#181615] focus:outline-none " + (errors.city ? 'border-red-500 ring-1 ring-red-400' : 'border-[#E7E1DA] focus:border-[#C85A32]')}
-                  >
-                    <option value="">Select your base city</option>
-                    {INDIAN_CITIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                  <div id="city-dropdown-root" className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsCityDropdownOpen(!isCityDropdownOpen)}
+                      className={"relative w-full h-10 rounded-xl border bg-white px-3 pr-9 text-left text-xs font-medium text-[#181615] shadow-sm transition-all focus:outline-none cursor-pointer flex items-center " + (
+                        errors.city
+                          ? 'border-red-500 ring-1 ring-red-400'
+                          : isCityDropdownOpen
+                            ? 'border-[#C85A32] ring-2 ring-[#C85A32]/10'
+                            : 'border-[#E7E1DA] hover:border-[#C85A32]/50'
+                      )}
+                    >
+                      <span className={"flex-1 truncate text-left " + (city ? 'text-[#181615]' : 'text-[#8a726a]')}>{city || 'Select your base city'}</span>
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-md bg-[#F4EFEB] text-[#8a726a]">
+                        <ChevronDown className={"h-3.5 w-3.5 transition-transform duration-200 " + (isCityDropdownOpen ? 'rotate-180' : '')} />
+                      </span>
+                    </button>
+
+                    {isCityDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 overflow-hidden rounded-xl border border-[#E7E1DA] bg-white shadow-[0_12px_25px_rgba(24,22,21,0.12)]">
+                        <div className="max-h-56 overflow-y-auto pr-1.5 scrollbar-thin scrollbar-thumb-[#D9C7BF] scrollbar-track-transparent">
+                          {INDIAN_CITIES.map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => {
+                                setCity(c);
+                                setIsCityDropdownOpen(false);
+                                if (errors.city) setErrors(prev => ({ ...prev, city: '' }));
+                              }}
+                              className={"w-full px-3 py-2 text-left text-sm font-medium transition-colors border-b border-transparent last:border-b-0 " + (
+                                city === c
+                                  ? 'bg-[#F4EFEB] text-[#181615] font-semibold'
+                                  : 'text-[#181615] hover:bg-[#F4EFEB]'
+                              )}
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {errors.city && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.city}</p>}
                 </div>
 
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-[#181615] mb-1.5">Years of Professional Experience</label>
-                  <Input type="number" value={experienceYears} onChange={(e) => setExperienceYears(Number(e.target.value))} placeholder="e.g. 5" min={1} max={40} />
+                  <Input
+                    type="number"
+                    value={experienceYears}
+                    min={0}
+                    max={40}
+                    onKeyDown={blockNegativeNumberKeys}
+                    onChange={(e) => {
+                      const sanitized = sanitizeNonNegativeNumber(e.target.value);
+                      setExperienceYears(sanitized === '' ? '' : Number(sanitized));
+                    }}
+                    placeholder="e.g. 5"
+                  />
                 </div>
               </div>
 
@@ -785,15 +1162,18 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                     {errors.standardTitle && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.standardTitle}</p>}
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#181615] mb-1.5">Price (₉ INR) *</label>
+                    <label className="block text-xs font-bold text-[#181615] mb-1.5">Price (INR) *</label>
                     <Input
                       type="number"
                       value={standardRate}
+                      min={0}
+                      step={5000}
+                      onKeyDown={blockNegativeNumberKeys}
                       onChange={(e) => {
-                        setStandardRate(Number(e.target.value));
+                        const sanitized = sanitizeNonNegativeNumber(e.target.value);
+                        setStandardRate(sanitized === '' ? '' : Number(sanitized));
                         if (errors.standardRate) setErrors(prev => ({ ...prev, standardRate: "" }));
                       }}
-                      step={5000}
                       className={errors.standardRate ? "border-red-500 ring-1 ring-red-400" : ""}
                     />
                     {errors.standardRate && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.standardRate}</p>}
@@ -803,19 +1183,31 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                     <Input
                       type="number"
                       value={standardHours}
+                      min={0}
+                      max={18}
+                      onKeyDown={blockNegativeNumberKeys}
                       onChange={(e) => {
-                        setStandardHours(Number(e.target.value));
+                        const sanitized = sanitizeNonNegativeNumber(e.target.value);
+                        setStandardHours(sanitized === '' ? '' : Number(sanitized));
                         if (errors.standardHours) setErrors(prev => ({ ...prev, standardHours: "" }));
                       }}
-                      min={2}
-                      max={18}
                       className={errors.standardHours ? "border-red-500 ring-1 ring-red-400" : ""}
                     />
                     {errors.standardHours && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.standardHours}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-[#181615] mb-1.5">Turnaround Time (Business Days)</label>
-                    <Input type="number" value={turnaroundDays} onChange={(e) => setTurnaroundDays(Number(e.target.value))} min={1} max={30} />
+                    <Input
+                      type="number"
+                      value={turnaroundDays}
+                      min={0}
+                      max={30}
+                      onKeyDown={blockNegativeNumberKeys}
+                      onChange={(e) => {
+                        const sanitized = sanitizeNonNegativeNumber(e.target.value);
+                        setTurnaroundDays(sanitized === '' ? '' : Number(sanitized));
+                      }}
+                    />
                   </div>
                 </div>
                 <div>
@@ -862,8 +1254,11 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
                     Click to select photos from device or drag & drop
                   </span>
                   <span className="text-[11px] text-[#8a726a] mt-1">
-                    Select multiple JPG, PNG, or WebP images (Up to 15MB each)
+                    Select multiple JPG, PNG, or WebP images (Up to 15MB each, max {MAX_PORTFOLIO_IMAGES} total)
                   </span>
+                  {errors.portfolio && (
+                    <p className="text-[11px] text-red-600 font-medium mt-2 text-left w-full">{errors.portfolio}</p>
+                  )}
                 </label>
 
                 {/* Optional URL addition */}

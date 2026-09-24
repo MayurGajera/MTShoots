@@ -11,8 +11,8 @@ import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { MTShootsLogo } from '../components/MTShootsLogo';
 import { PhotographerCard } from '../components/PhotographerCard';
+import { ShimmerCard } from '../components/ShimmerCard';
 import { Photographer } from '../types';
-import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
 import { loadPhotographers, isSupabaseConfigured } from '../lib/supabase';
 import { fetchCategories, fetchTestimonials } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
@@ -158,9 +158,14 @@ export const LandingPage: React.FC = () => {
     const syncCity = () => {
       const storedCity = localStorage.getItem('mtshoots_city');
       const city = storedCity || selectedCity || '';
-      if (city && city !== searchCity) {
-        setSearchCity(city);
-      }
+
+      setSearchCity(prev => {
+        if (prev === '' && city) {
+          return prev;
+        }
+        if (!city) return prev;
+        return prev === city ? prev : city;
+      });
     };
 
     syncCity();
@@ -171,7 +176,7 @@ export const LandingPage: React.FC = () => {
       window.removeEventListener('mtshoots-city-changed', syncCity);
       window.removeEventListener('storage', syncCity);
     };
-  }, [selectedCity, searchCity]);
+  }, [selectedCity]);
 
   const [searchDate, setSearchDate] = useState(() => {
     const d = new Date();
@@ -179,18 +184,50 @@ export const LandingPage: React.FC = () => {
     return d.toISOString().split('T')[0];
   });
 
-  // Shortlist state for featured cards
+  // Shortlist state for featured cards (only for signed-in users)
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     try {
       if (typeof window === 'undefined') return [];
+      const user = localStorage.getItem('mtshoots_user');
+      if (!user) return [];
       const saved = localStorage.getItem('capturely_shortlist');
-      return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return ['darshan-mehta', 'rohan-varma'];
+      return [];
     }
   });
 
+  useEffect(() => {
+    const syncShortlist = () => {
+      try {
+        const user = localStorage.getItem('mtshoots_user');
+        if (!user) {
+          setShortlistIds([]);
+          return;
+        }
+        const saved = localStorage.getItem('capturely_shortlist');
+        setShortlistIds(saved ? JSON.parse(saved) : []);
+      } catch {
+        setShortlistIds([]);
+      }
+    };
+    syncShortlist();
+    window.addEventListener('storage', syncShortlist);
+    window.addEventListener('mtshoots-auth-changed', syncShortlist);
+    return () => {
+      window.removeEventListener('storage', syncShortlist);
+      window.removeEventListener('mtshoots-auth-changed', syncShortlist);
+    };
+  }, []);
+
   const handleToggleShortlist = (id: string) => {
+    try {
+      const user = localStorage.getItem('mtshoots_user');
+      if (!user) {
+        navigate('/auth');
+        return;
+      }
+    } catch {}
     const next = shortlistIds.includes(id)
       ? shortlistIds.filter(x => x !== id)
       : [...shortlistIds, id];
@@ -213,7 +250,6 @@ export const LandingPage: React.FC = () => {
     if (searchCategory && searchCategory !== 'All') params.set('category', searchCategory);
     if (searchCity.trim()) {
       params.set('city', searchCity.trim());
-      handleLocationSelect(searchCity.trim());
     }
     if (searchDate) params.set('date', searchDate);
     navigate(`/photographers?${params.toString()}`);
@@ -237,21 +273,24 @@ export const LandingPage: React.FC = () => {
     }
   };
 
-  const [allPhotographersList, setAllPhotographersList] = useState<Photographer[]>(() => getAllPhotographers());
+  const [allPhotographersList, setAllPhotographersList] = useState<Photographer[]>([]);
+  const [isLoadingPhotographers, setIsLoadingPhotographers] = useState(true);
 
   useEffect(() => {
     const handleUpdate = () => {
-      setAllPhotographersList(getAllPhotographers());
+      loadPhotographers().then((remote) => {
+        if (remote) setAllPhotographersList(remote);
+      }).catch(() => {});
     };
     window.addEventListener('photographers-updated', handleUpdate);
 
-    if (isSupabaseConfigured()) {
-      loadPhotographers().then((remote) => {
-        if (remote && remote.length > 0) {
-          setAllPhotographersList(remote);
-        }
-      }).catch(() => {});
-    }
+    loadPhotographers().then((remote) => {
+      if (remote) {
+        setAllPhotographersList(remote);
+      }
+    }).catch(() => {}).finally(() => {
+      setIsLoadingPhotographers(false);
+    });
 
     return () => window.removeEventListener('photographers-updated', handleUpdate);
   }, []);
@@ -280,7 +319,7 @@ export const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col">
+    <div className="min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col pt-16">
       {/* Unified Global Navbar */}
       <Navbar />
 
@@ -388,7 +427,6 @@ export const LandingPage: React.FC = () => {
                     onChange={setSearchCity}
                     onSelectCity={(city) => {
                       setSearchCity(city);
-                      handleLocationSelect(city);
                     }}
                     placeholder="e.g. Mumbai, Delhi, Jaipur"
                     inputClassName="text-xs font-bold text-[#181615] placeholder-[#8a726a]"
@@ -521,32 +559,45 @@ export const LandingPage: React.FC = () => {
             to="/photographers"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#181615] text-white text-xs font-semibold hover:bg-[#C85A32] transition-colors self-start sm:self-auto cursor-pointer"
           >
-            <span>View All Photographers ({allPhotographersList.length})</span>
+            <span>View All Photographers</span>
+            {isLoadingPhotographers ? (
+              <span className="w-5 h-3.5 bg-white/20 animate-pulse rounded inline-block" />
+            ) : (
+              <span>({allPhotographersList.length})</span>
+            )}
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
 
         {/* Responsive Cards: Swipeable Carousel on Mobile, Grid on Tablet/Desktop */}
-        <div
-          ref={featuredScrollRef}
-          onScroll={handleFeaturedScroll}
-          className="flex overflow-x-auto snap-x snap-mandatory gap-5 pb-4 pt-1 px-4 -mx-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-8 md:overflow-visible no-scrollbar"
-        >
-          {featuredPhotographers.map(p => (
-            <div
-              key={p.id}
-              className="w-[85vw] max-w-[340px] shrink-0 snap-center md:w-auto md:max-w-none md:shrink md:snap-none flex flex-col"
-            >
-              <PhotographerCard
-                photographer={p}
-                onSelect={() => navigate(`/photographers/${p.id}`)}
-                onQuickBook={() => navigate(`/photographers/${p.id}`)}
-                isSaved={shortlistIds.includes(p.id)}
-                onToggleSave={handleToggleShortlist}
-              />
-            </div>
-          ))}
-        </div>
+        {isLoadingPhotographers ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-8">
+            <ShimmerCard />
+            <ShimmerCard />
+            <ShimmerCard />
+          </div>
+        ) : (
+          <div
+            ref={featuredScrollRef}
+            onScroll={handleFeaturedScroll}
+            className={`flex overflow-x-auto snap-x snap-mandatory gap-5 pb-4 pt-1 px-4 -mx-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:grid md:grid-cols-2 ${featuredPhotographers.length >= 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-3'} md:gap-8 md:overflow-visible no-scrollbar`}
+          >
+            {featuredPhotographers.map(p => (
+              <div
+                key={p.id}
+                className="w-[85vw] max-w-[340px] shrink-0 snap-center md:w-auto md:max-w-none md:shrink md:snap-none flex flex-col"
+              >
+                <PhotographerCard
+                  photographer={p}
+                  onSelect={() => navigate(`/photographers/${p.id}`)}
+                  onQuickBook={() => navigate(`/photographers/${p.id}`)}
+                  isSaved={Boolean(typeof window !== 'undefined' && localStorage.getItem('mtshoots_user') && shortlistIds.includes(p.id))}
+                  onToggleSave={handleToggleShortlist}
+                />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Mobile Carousel Indicators (Only when multiple cards exist) */}
         {featuredPhotographers.length > 1 && (

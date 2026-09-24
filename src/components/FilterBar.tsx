@@ -45,6 +45,7 @@ interface FilterBarProps {
   totalResults: number;
   totalCount: number;
   onResetFilters: () => void;
+  isLoading?: boolean;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -71,7 +72,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   cities,
   totalResults,
   totalCount,
-  onResetFilters
+  onResetFilters,
+  isLoading = false
 }) => {
   const [categoriesList, setCategoriesList] = useState<PhotographyCategory[]>(PHOTOGRAPHY_CATEGORIES);
 
@@ -91,11 +93,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     }).catch(() => {});
   }, []);
   // Compute active filters
+  const normalizedSelectedCity = selectedCity === 'All Cities' ? 'All' : selectedCity;
+
   const activeFilters = [
     searchQuery.trim() !== '',
     selectedCategory !== 'all' && selectedCategory !== 'All Categories',
     selectedExperience !== 'all',
-    selectedCity !== 'All',
+    normalizedSelectedCity !== 'All',
     budgetRange !== 'all',
     onlyAvailableNow,
     onlyTopRated,
@@ -219,8 +223,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             <span className="text-[#8a726a] font-normal">City:</span>
             <select
               id="city-location-select"
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
+              value={normalizedSelectedCity}
+              onChange={(e) => {
+                const nextCity = e.target.value === 'All Cities' ? 'All' : e.target.value;
+                setSelectedCity(nextCity);
+              }}
               className="bg-transparent focus:outline-none cursor-pointer text-xs font-medium text-[#181615]"
             >
               <option value="All">All Cities</option>
@@ -317,8 +324,15 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <span>Reset ({activeCount})</span>
             </button>
           ) : (
-            <span className="text-[11px] text-[#8a726a] px-1">
-              Showing {totalResults} of {totalCount}
+            <span className="text-[11px] text-[#8a726a] px-1 min-w-[90px] inline-flex items-center">
+              {isLoading ? (
+                <span className="inline-flex items-center gap-1">
+                  <span>Showing</span>
+                  <span className="inline-block w-12 h-2.5 rounded bg-[#E7E1DA] animate-pulse" />
+                </span>
+              ) : (
+                `Showing ${totalResults} of ${totalCount}`
+              )}
             </span>
           )}
         </div>

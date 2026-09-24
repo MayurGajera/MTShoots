@@ -3,10 +3,10 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Link } from '@/lib/navigation';
 import {
   X, Calendar, MapPin, Clock, User, Mail, FileText, CheckCircle2,
-  ShieldAlert, Check, ChevronDown, Lock, LogIn, Sparkles, AlertCircle
+  ShieldAlert, Check, ChevronDown, Lock, LogIn, Sparkles, AlertCircle,
+  Eye, EyeOff
 } from 'lucide-react';
-import { Photographer, BookingRequest, ShootDurationType, UsageRightsTier } from '../types';
-import { AVAILABLE_ADDONS } from '../data/photographers';
+import { Photographer, BookingRequest, ShootDurationType, UsageRightsTier, BookingAddOn } from '../types';
 import { fetchAddOns, DbAddOn, upsertUser, getUserByEmail } from '@/lib/supabase';
 import { formatINR } from '../utils/format';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -90,7 +90,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
 }) => {
   useScrollLock(true);
 
-  const [addOnsList, setAddOnsList] = useState(AVAILABLE_ADDONS);
+  const [addOnsList, setAddOnsList] = useState<BookingAddOn[]>([]);
 
   useEffect(() => {
     fetchAddOns().then(dbAddOns => {
@@ -170,6 +170,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [showQuickPassword, setShowQuickPassword] = useState(false);
   const [authName, setAuthName] = useState('');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [authLoading, setAuthLoading] = useState(false);
@@ -237,43 +238,96 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
 
   const handleQuickAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!authEmail.trim()) {
+
+    const normalizedEmail = authEmail.trim().toLowerCase();
+    const normalizedPassword = authPassword.trim();
+
+    if (!normalizedEmail) {
       setAuthError('Please enter your email address');
       return;
     }
+    if (!normalizedPassword) {
+      setAuthError('Please enter your password');
+      return;
+    }
+
     setAuthLoading(true);
     setAuthError('');
+
     try {
-      const finalName = authName.trim() || authEmail.split('@')[0].replace(/[._]/g, ' ');
+      const readAccounts = () => {
+        try {
+          return JSON.parse(localStorage.getItem('mtshoots_accounts') || '[]');
+        } catch {
+          return [];
+        }
+      };
+
+      const writeAccounts = (accounts: any[]) => {
+        localStorage.setItem('mtshoots_accounts', JSON.stringify(accounts));
+      };
+
+      const finalName = (authName || authEmail).trim() || authEmail.split('@')[0].replace(/[._]/g, ' ');
       let userObj: any = {
         id: 'usr-' + Date.now(),
         fullName: finalName,
-        email: authEmail.trim().toLowerCase(),
-        role: 'client'
+        email: normalizedEmail,
+        role: 'customer'
       };
 
-      try {
-        if (authMode === 'signup') {
+      const accounts = readAccounts();
+      const existingAccount = accounts.find((account: any) => String(account.email).toLowerCase() === normalizedEmail);
+
+      if (authMode === 'signin') {
+        const matchedAccount = accounts.find((account: any) => {
+          return String(account.email).toLowerCase() === normalizedEmail && String(account.password) === normalizedPassword;
+        });
+
+        if (!matchedAccount) {
+          setAuthError('No account matched this email and password. Please create an account or check your details.');
+          return;
+        }
+
+        userObj = {
+          id: matchedAccount.id || userObj.id,
+          fullName: matchedAccount.fullName || matchedAccount.full_name || finalName,
+          email: normalizedEmail,
+          role: matchedAccount.role || 'customer'
+        };
+      } else {
+        if (existingAccount) {
+          setAuthError('An account with this email already exists. Please sign in instead.');
+          return;
+        }
+
+        const newAccount = {
+          id: userObj.id,
+          fullName: finalName,
+          email: normalizedEmail,
+          password: normalizedPassword,
+          role: 'customer',
+          createdAt: new Date().toISOString()
+        };
+
+        accounts.push(newAccount);
+        writeAccounts(accounts);
+
+        try {
           const dbUser = await upsertUser({
-            email: authEmail.trim().toLowerCase(),
+            email: normalizedEmail,
             full_name: finalName,
-            role: 'client'
+            role: 'customer'
           });
           if (dbUser?.id) userObj.id = dbUser.id;
-        } else {
-          const dbUser = await getUserByEmail(authEmail.trim().toLowerCase());
-          if (dbUser?.id) {
-            userObj.id = dbUser.id;
-            userObj.fullName = dbUser.full_name || finalName;
-          }
-        }
-      } catch {}
+        } catch {}
+      }
 
       localStorage.setItem('mtshoots_user', JSON.stringify(userObj));
       window.dispatchEvent(new CustomEvent('mtshoots-auth-changed'));
       setCurrentUser(userObj);
       if (!artDirectorName) setArtDirectorName(userObj.fullName);
       if (!artDirectorEmail) setArtDirectorEmail(userObj.email);
+      setAuthPassword('');
       setShowAuthModal(false);
     } catch (err: any) {
       setAuthError(err?.message || 'Authentication failed. Please try again.');
@@ -934,14 +988,24 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
                   <label className="text-[10px] uppercase font-bold text-[#8a726a] block mb-1">
                     Password
                   </label>
-                  <input
-                    type="password"
-                    required
-                    value={authPassword}
-                    onChange={(e) => setAuthPassword(e.target.value)}
-                    placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
-                    className="w-full px-3 py-2 rounded-xl border border-[#E7E1DA] text-xs text-[#181615] focus:outline-none focus:border-[#C85A32]"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showQuickPassword ? 'text' : 'password'}
+                      required
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+                      className="w-full px-3 py-2 pr-10 rounded-xl border border-[#E7E1DA] text-xs text-[#181615] focus:outline-none focus:border-[#C85A32]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a726a] hover:text-[#181615] cursor-pointer p-1"
+                      tabIndex={-1}
+                    >
+                      {showQuickPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <button

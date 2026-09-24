@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   Star,
@@ -14,8 +14,8 @@ import {
   FileText,
   Share2
 } from 'lucide-react';
-import { Photographer, PortfolioItem, ShootDurationType, UsageRightsTier } from '../types';
-import { AVAILABLE_ADDONS } from '../data/photographers';
+import { Photographer, PortfolioItem, ShootDurationType, UsageRightsTier, BookingAddOn } from '../types';
+import { fetchAddOns } from '../lib/supabase';
 import { formatINR } from '../utils/format';
 
 interface PhotographerDetailModalProps {
@@ -51,11 +51,27 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
   const [durationType, setDurationType] = useState<ShootDurationType>('full-day');
   const [usageRights] = useState<UsageRightsTier>('commercial-standard');
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>(['medium-format']);
+  const [addOnsList, setAddOnsList] = useState<BookingAddOn[]>([]);
   const [isCallSheetStripExpanded, setIsCallSheetStripExpanded] = useState(true);
   const [activePortfolioTab, setActivePortfolioTab] = useState<string>('all');
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [shootLocation, setShootLocation] = useState<string>(photographer.officeLocation || photographer.location);
+
+  useEffect(() => {
+    fetchAddOns().then((dbAddOns) => {
+      if (dbAddOns && dbAddOns.length > 0) {
+        setAddOnsList(
+          dbAddOns.map((a) => ({
+            id: a.id,
+            name: a.name,
+            price: a.price,
+            description: a.description || ''
+          }))
+        );
+      }
+    }).catch(() => {});
+  }, []);
 
   const durationMultiplier = durationType === 'half-day' ? 0.6 : durationType === 'full-day' ? 1 : durationType === 'two-day' ? 1.9 : 2.7;
   const baseRate = Math.round(photographer.dayRate * durationMultiplier);
@@ -63,7 +79,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
   const usageCost = Math.round(photographer.dayRate * usageMultiplier);
 
   const addOnsTotal = selectedAddOns.reduce((sum, addOnId) => {
-    const item = AVAILABLE_ADDONS.find((a) => a.id === addOnId);
+    const item = addOnsList.find((a) => a.id === addOnId);
     return sum + (item ? item.price : 0);
   }, 0);
 
@@ -76,6 +92,39 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
     } else {
       setSelectedAddOns([...selectedAddOns, id]);
     }
+  };
+
+  const isUserSignedIn = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return !!localStorage.getItem('mtshoots_user');
+    } catch { return false; }
+  };
+
+  const isActuallySaved = Boolean(isSaved && isUserSignedIn());
+
+  const handleToggleSave = () => {
+    if (!isUserSignedIn()) {
+      window.location.href = '/auth';
+      return;
+    }
+    if (onToggleSave) onToggleSave(photographer.id);
+  };
+
+  const handleContinueBooking = () => {
+    if (!isUserSignedIn()) {
+      window.location.href = '/auth';
+      return;
+    }
+    onStartBooking({
+      photographer,
+      selectedDate,
+      durationType,
+      usageRights,
+      selectedAddOns,
+      totalCost,
+      shootLocation
+    });
   };
 
   const locationOptions = [
@@ -214,15 +263,15 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
             </button>
             <button
               type="button"
-              onClick={() => onToggleSave(photographer.id)}
+              onClick={handleToggleSave}
               className={`p-2 rounded-full border transition-all cursor-pointer ${
-                isSaved
+                isActuallySaved
                   ? 'bg-[#C85A32] text-white border-[#C85A32]'
                   : 'bg-white text-[#181615] border-[#E7E1DA] hover:bg-[#F4EFEB]'
               }`}
-              title={isSaved ? 'Remove from Saved' : 'Save to Shortlist'}
+              title={isActuallySaved ? 'Remove from Saved' : 'Save to Shortlist'}
             >
-              <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+              <Heart className={`w-4 h-4 ${isActuallySaved ? 'fill-current' : ''}`} />
             </button>
             <button
               id="close-photographer-modal-btn"
@@ -727,7 +776,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
                   Optional Add-Ons (Crew &amp; Equipment)
                 </label>
                 <div className="space-y-1.5">
-                  {AVAILABLE_ADDONS.map((addOn) => {
+                  {addOnsList.map((addOn) => {
                     const isChecked = selectedAddOns.includes(addOn.id);
                     return (
                       <label
@@ -790,17 +839,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
               <button
                 id="request-call-sheet-btn"
                 type="button"
-                onClick={() =>
-                  onStartBooking({
-                    photographer,
-                    selectedDate,
-                    durationType,
-                    usageRights,
-                    selectedAddOns,
-                    totalCost,
-                    shootLocation
-                  })
-                }
+                onClick={handleContinueBooking}
                 className="w-full py-3.5 px-4 rounded-lg bg-[#C85A32] text-white text-sm font-bold uppercase tracking-wider hover:bg-[#B24E2A] transition-all shadow-md active:scale-98 flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <span>Continue to Shoot Details</span>

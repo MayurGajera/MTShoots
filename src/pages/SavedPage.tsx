@@ -1,9 +1,8 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, Camera, ArrowLeft, X } from 'lucide-react';
 import { Link, useNavigate } from '@/lib/navigation';
 import { Photographer } from '../types';
-import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '../data/photographers';
 import { loadPhotographers } from '../lib/supabase';
 import { PhotographerCard } from '../components/PhotographerCard';
 import { PhotographerDetailModal } from '../components/PhotographerDetailModal';
@@ -11,33 +10,51 @@ import { BookingSheetModal } from '../components/BookingSheetModal';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { BookingRequest } from '../types';
-import { INITIAL_BOOKINGS } from '../data/photographers';
 import { PortfolioItem, ShootDurationType, UsageRightsTier } from '../types';
 
 export const SavedPage: React.FC = () => {
   const navigate = useNavigate();
-  const [allPhotographers, setAllPhotographers] = useState<Photographer[]>(() => getAllPhotographers());
+  const [allPhotographers, setAllPhotographers] = useState<Photographer[]>([]);
 
   React.useEffect(() => {
     loadPhotographers().then(remote => {
-      if (remote && remote.length > 0) setAllPhotographers(remote);
+      if (remote) setAllPhotographers(remote);
     }).catch(() => {});
+  }, []);
+
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      if (typeof window === 'undefined') return null;
+      const stored = localStorage.getItem('mtshoots_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    const syncUser = () => {
+      try {
+        const stored = localStorage.getItem('mtshoots_user');
+        setCurrentUser(stored ? JSON.parse(stored) : null);
+      } catch { setCurrentUser(null); }
+    };
+    window.addEventListener('mtshoots-auth-changed', syncUser);
+    return () => window.removeEventListener('mtshoots-auth-changed', syncUser);
   }, []);
 
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     try {
       if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_shortlist');
-      return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
-    } catch { return ['darshan-mehta', 'rohan-varma']; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [bookings, setBookings] = useState<BookingRequest[]>(() => {
     try {
       if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_bookings');
-      return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
-    } catch { return INITIAL_BOOKINGS; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [selectedPhotographer, setSelectedPhotographer] = useState<Photographer | null>(null);
@@ -89,8 +106,33 @@ export const SavedPage: React.FC = () => {
     try { localStorage.setItem('capturely_bookings', JSON.stringify(updated)); } catch {}
     setIsBookingModalOpen(false);
     setBookingConfig(null);
-    triggerToast('Booking confirmed!');
   };
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F5] flex flex-col">
+        <Navbar shortlistCount={0} bookingCount={0} />
+        <main className="flex-1 flex items-center justify-center px-4 py-20">
+          <div className="text-center max-w-md">
+            <div className="w-20 h-20 rounded-2xl bg-[#F4EFEB] flex items-center justify-center mx-auto mb-6">
+              <Heart className="w-10 h-10 text-[#8a726a]" />
+            </div>
+            <h2 className="font-serif text-2xl font-bold text-[#181615] mb-3">Sign in to view saved photographers</h2>
+            <p className="text-sm text-[#57423b] leading-relaxed mb-8">
+              Keep your favorite photographers and shortlisted talent organized in one place by signing in to your account.
+            </p>
+            <Link
+              to="/auth"
+              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-[#C85A32] text-white text-sm font-bold hover:bg-[#B24E2A] transition-all shadow-lg cursor-pointer"
+            >
+              Sign In
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] flex flex-col pb-24 md:pb-0">

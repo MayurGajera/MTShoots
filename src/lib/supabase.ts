@@ -1,6 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Photographer, BookingRequest } from '../types';
-import { INITIAL_PHOTOGRAPHERS, INITIAL_BOOKINGS, getAllPhotographers, getStoredRegisteredPhotographers } from '../data/photographers';
 
 // Environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -32,6 +31,50 @@ export const getSupabaseClient = (): SupabaseClient | null => {
     }
   }
   return _supabaseClient;
+};
+
+export const extractSupabaseStoragePath = (url?: string): string | null => {
+  if (!url || typeof url !== 'string') return null;
+
+  try {
+    const parsed = new URL(url);
+    const match = parsed.pathname.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/i);
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch {
+    const match = url.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/i);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+};
+
+export const deleteSupabaseStorageFileByUrl = async (url?: string): Promise<boolean> => {
+  if (!url) return false;
+
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  const path = extractSupabaseStoragePath(url);
+  if (!path) return false;
+
+  try {
+    const bucket = path.split('/')[0];
+    const objectPath = path.slice(bucket.length + 1);
+    const { error } = await client.storage.from(bucket).remove([objectPath]);
+    if (error) {
+      console.warn('Supabase storage delete failed:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Supabase storage delete exception:', err);
+    return false;
+  }
+};
+
+export const replaceSupabaseStorageFileByUrl = async (oldUrl?: string, newUrl?: string): Promise<boolean> => {
+  if (oldUrl && oldUrl !== newUrl) {
+    await deleteSupabaseStorageFileByUrl(oldUrl);
+  }
+  return Boolean(newUrl);
 };
 
 // Ready-to-execute PostgreSQL Schema for Supabase SQL Editor
@@ -173,18 +216,25 @@ export async function testSupabaseConnection(): Promise<{
 }
 
 /**
- * Load Photographers from Supabase with graceful fallback
+/**
+ * Load Photographers exclusively from Supabase database
  */
 export async function loadPhotographers(): Promise<Photographer[]> {
   const client = getSupabaseClient();
   if (!client) {
-    return getAllPhotographers();
+    console.warn('Supabase client unavailable');
+    return [];
   }
 
   try {
-    const { data, error } = await client.from('photographers').select('*');
+    const { data, error } = await client
+      .from('photographers')
+      .select('*')
+      .order('rating', { ascending: false });
+
     if (error || !data || data.length === 0) {
-      return getAllPhotographers();
+      if (error) console.warn('Supabase loadPhotographers error:', error.message);
+      return [];
     }
 
     // Map database snake_case columns to TypeScript camelCase
@@ -220,18 +270,10 @@ export async function loadPhotographers(): Promise<Photographer[]> {
       portfolio: row.portfolio || []
     }));
 
-    // Merge with any locally stored registered photographers so new profiles always appear
-    const localRegistered = getStoredRegisteredPhotographers();
-    const combined = [...remoteList];
-    for (const local of localRegistered) {
-      if (!combined.some(c => c.id === local.id)) {
-        combined.unshift(local);
-      }
-    }
-    return combined.length > 0 ? combined : getAllPhotographers();
+    return remoteList;
   } catch (err) {
-    console.warn('Failed to fetch photographers from Supabase, falling back to all local:', err);
-    return getAllPhotographers();
+    console.warn('Failed to fetch photographers from Supabase:', err);
+    return [];
   }
 }
 
@@ -250,7 +292,7 @@ export async function savePhotographerToSupabase(photographer: Photographer): Pr
       base_city: photographer.baseCity || photographer.location?.split(',')[0]?.trim() || 'Mumbai',
       office_location: photographer.officeLocation || null,
       office_address: photographer.officeAddress || null,
-      office_map_url: photographer.officeMapUrl || null,
+      officeMapUrl: photographer.officeMapUrl || null,
       avatar: photographer.avatar,
       hero_image: photographer.heroImage || photographer.coverImage || photographer.portfolio?.[0]?.imageUrl || photographer.avatar,
       primary_category: photographer.primaryCategory || photographer.specialties?.[0] || 'Commercial & Advertising',
@@ -291,10 +333,7 @@ export async function savePhotographerToSupabase(photographer: Photographer): Pr
 }
 
 /**
- * Fetch a single Photographer by ID or Slug with fallback
- */
-/**
- * Fetch a single Photographer by ID or Slug from Supabase DB with safe fallback
+ * Fetch a single Photographer by ID or Slug from Supabase DB
  */
 export async function getPhotographerById(id: string): Promise<Photographer | null> {
   const client = getSupabaseClient();
@@ -344,10 +383,7 @@ export async function getPhotographerById(id: string): Promise<Photographer | nu
     }
   }
 
-  // Fallback to local memory and registered profiles
-  const localList = getAllPhotographers();
-  const localMatch = localList.find(p => p.id === id || p.id === decodeURIComponent(id));
-  return localMatch || null;
+  return null;
 }
 
 /**
@@ -531,7 +567,6 @@ export interface DbUserDevice {
 
 // ─── Static fallback data ─────────────────────────────────────────────────────
 import { PHOTOGRAPHY_CATEGORIES } from '../data/categories';
-import { AVAILABLE_ADDONS } from '../data/photographers';
 
 const FALLBACK_CITIES = [
   'Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata',
@@ -601,10 +636,7 @@ export async function fetchCitiesWithMeta(): Promise<DbCity[]> {
 
 export async function fetchAddOns(): Promise<DbAddOn[]> {
   const client = getSupabaseClient();
-  if (!client) return AVAILABLE_ADDONS.map((a, i) => ({
-    id: a.id, name: a.name, price: a.price,
-    description: a.description || '', is_active: true, sort_order: i,
-  }));
+  if (!client) return [];
 
   try {
     const { data, error } = await client
@@ -615,10 +647,7 @@ export async function fetchAddOns(): Promise<DbAddOn[]> {
     if (error || !data?.length) throw error || new Error('empty');
     return data;
   } catch {
-    return AVAILABLE_ADDONS.map((a, i) => ({
-      id: a.id, name: a.name, price: a.price,
-      description: a.description || '', is_active: true, sort_order: i,
-    }));
+    return [];
   }
 }
 

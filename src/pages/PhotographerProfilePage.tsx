@@ -9,7 +9,6 @@ import {
   Sliders, ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { INITIAL_PHOTOGRAPHERS, AVAILABLE_ADDONS, getAllPhotographers } from '../data/photographers';
 import { getPhotographerById } from '../lib/supabase';
 import { ApertureLoader } from '../components/ApertureLoader';
 import { Photographer, PortfolioItem, ShootDurationType, UsageRightsTier } from '../types';
@@ -44,29 +43,39 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [photographer, setPhotographer] = useState<Photographer | null>(() => {
-    const all = getAllPhotographers();
-    return all.find(p => p.id === id || p.id === decodeURIComponent(id || '')) || null;
-  });
-  const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(!photographer);
+  const isUserSignedIn = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return !!localStorage.getItem('mtshoots_user');
+    } catch { return false; }
+  };
+
+  const handleToggleSave = (photographerId: string) => {
+    if (!isUserSignedIn()) {
+      navigate('/auth');
+      return;
+    }
+    onToggleSave(photographerId);
+  };
+
+  const [photographer, setPhotographer] = useState<Photographer | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(true);
 
   useEffect(() => {
     let isMounted = true;
-    const local = getAllPhotographers().find(p => p.id === id || p.id === decodeURIComponent(id || ''));
-    if (local) {
-      setPhotographer(local);
-      setIsLoadingProfile(false);
-    }
-
     async function loadRemoteProfile() {
-      if (!id) return;
+      if (!id) {
+        setIsLoadingProfile(false);
+        return;
+      }
+      setIsLoadingProfile(true);
       try {
         const remote = await getPhotographerById(id);
-        if (isMounted && remote) {
+        if (isMounted) {
           setPhotographer(remote);
         }
       } catch (err) {
-        console.warn('Error fetching remote photographer profile:', err);
+        console.warn('Error fetching remote photographer profile from Supabase:', err);
       } finally {
         if (isMounted) setIsLoadingProfile(false);
       }
@@ -334,30 +343,236 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
   }
 
   if (!photographer) {
+    let previewData: any = null;
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('mtshoots_photographer_profile');
+        if (raw) previewData = JSON.parse(raw);
+        if (!previewData) {
+          const rawReg = localStorage.getItem('mtshoots_registered_photographers');
+          if (rawReg) {
+            const list = JSON.parse(rawReg);
+            if (Array.isArray(list) && list.length > 0) previewData = list[0];
+          }
+        }
+      }
+    } catch {}
+
+    const artistName = previewData?.name || (id ? decodeURIComponent(id).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Verified Photographer');
+    const artistCategory = previewData?.primaryCategory || 'Fashion & Editorial Photography';
+    const artistLocation = previewData?.location || 'Mumbai, India';
+    const artistDayRate = previewData?.dayRate || 600000;
+    const artistTurnaround = previewData?.turnaroundDays || 23;
+    const artistDeposit = previewData?.advanceDeposit || 25;
+    const artistBio = previewData?.bio || 'Celebrated visual artist and commercial photographer specializing in high-impact campaigns and editorial storytelling across India.';
+
     return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col justify-between">
+      <div className="min-h-screen bg-[#181615] text-white flex flex-col justify-between selection:bg-[#C85A32] selection:text-white">
         <Navbar />
-        <div className="max-w-md mx-auto my-auto px-4 py-16 text-center">
-          <div className="w-16 h-16 rounded-full bg-[#fbf2ee] flex items-center justify-center mx-auto mb-4">
-            <Camera className="w-8 h-8 text-[#C85A32]" />
-          </div>
-          <h2 className="font-serif text-2xl font-bold text-[#181615] mb-2">Photographer Not Found</h2>
-          <p className="text-sm text-[#57423b] mb-6">
-            The photographer profile you are looking for does not exist or has been relocated.
-          </p>
-          <Link
-            to="/photographers"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#C85A32] text-white text-sm font-semibold hover:bg-[#B24E2A] transition-colors"
+
+        <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-12 sm:py-20 flex flex-col justify-center items-center text-center relative overflow-hidden">
+          {/* Animated Ambient Glow Orbs */}
+          <div className="absolute top-1/4 -left-20 w-72 h-72 rounded-full bg-[#C85A32]/20 blur-3xl pointer-events-none animate-pulse" />
+          <div className="absolute bottom-1/4 -right-20 w-80 h-80 rounded-full bg-[#D9A05B]/15 blur-3xl pointer-events-none animate-pulse delay-1000" />
+
+          {/* Animated Dual-Ring Aperture Visual */}
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="relative mb-6"
           >
-            <ArrowLeft className="w-4 h-4" /> Browse All Photographers
-          </Link>
-        </div>
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border border-[#C85A32]/40 bg-[#241815] flex items-center justify-center relative shadow-2xl shadow-[#C85A32]/30">
+              {/* Outer rotating ring */}
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 rounded-full border-2 border-dashed border-[#C85A32]/60"
+              />
+              {/* Inner glowing camera aperture */}
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#C85A32] to-[#D9A05B] flex items-center justify-center text-white shadow-lg">
+                <Camera className="w-7 h-7" />
+              </div>
+            </div>
+            {/* Sparkle badge */}
+            <motion.div
+              animate={{ y: [-2, 2, -2] }}
+              transition={{ duration: 3, repeat: Infinity }}
+              className="absolute -bottom-2 inset-x-0 flex justify-center"
+            >
+              <span className="px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#EAF4ED] text-[#2D593E] shadow-md border border-[#2D593E]/30 flex items-center gap-1 whitespace-nowrap">
+                <Sparkles className="w-3 h-3 text-[#2D593E]" /> Coming Soon &bull; In Curation
+              </span>
+            </motion.div>
+          </motion.div>
+
+          {/* Heading */}
+          <motion.h1
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="font-serif text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3"
+          >
+            {artistName}
+          </motion.h1>
+
+          <motion.p
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-sm sm:text-base text-stone-300 max-w-xl mx-auto leading-relaxed mb-8"
+          >
+            This verified photographer&rsquo;s complete editorial portfolio and booking calendar are securely stored in the MTShoots Cloud Database and undergoing final directory synchronization.
+          </motion.p>
+
+          {/* Live Data Snapshot Card from DB & Storage */}
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="w-full max-w-2xl bg-[#241815]/90 border border-[#422C24] rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl text-left space-y-6 mb-8"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#422C24] pb-4">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#D9A05B]">
+                <ShieldCheck className="w-4 h-4 text-[#4A7C59]" />
+                <span>Stored Database Record &bull; Live Preview</span>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#36221c] text-[#C85A32] border border-[#C85A32]/40">
+                {artistCategory}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs">
+              <div className="p-3.5 rounded-2xl bg-[#181615]/70 border border-[#422C24]">
+                <span className="text-[10px] text-stone-400 block uppercase font-bold">Day Rate</span>
+                <span className="text-base font-bold text-white font-sans mt-0.5 block">
+                  {formatINR(artistDayRate)}
+                </span>
+                <span className="text-[10px] text-stone-400">/ full day</span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#181615]/70 border border-[#422C24]">
+                <span className="text-[10px] text-stone-400 block uppercase font-bold">Base Location</span>
+                <span className="text-sm font-bold text-white mt-0.5 block truncate">
+                  {artistLocation}
+                </span>
+                <span className="text-[10px] text-[#4A7C59] font-medium flex items-center gap-1 mt-0.5">
+                  <Check className="w-2.5 h-2.5" /> Pan-India Travel
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#181615]/70 border border-[#422C24]">
+                <span className="text-[10px] text-stone-400 block uppercase font-bold">Turnaround</span>
+                <span className="text-sm font-bold text-white mt-0.5 block">
+                  {artistTurnaround} Business Days
+                </span>
+                <span className="text-[10px] text-stone-400">High-Res Delivery</span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#181615]/70 border border-[#422C24]">
+                <span className="text-[10px] text-stone-400 block uppercase font-bold">Booking Deposit</span>
+                <span className="text-sm font-bold text-[#C85A32] mt-0.5 block">
+                  {artistDeposit}% Advance
+                </span>
+                <span className="text-[10px] text-stone-400">Escrow Protected</span>
+              </div>
+            </div>
+
+            {artistBio && (
+              <div className="pt-2 text-xs text-stone-300 leading-relaxed border-t border-[#422C24]/60">
+                <span className="font-bold text-white block mb-1">Artist Overview:</span>
+                <p className="line-clamp-3 text-stone-400">{artistBio}</p>
+              </div>
+            )}
+          </motion.div>
+
+          {/* Action CTAs */}
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="flex flex-wrap items-center justify-center gap-3 w-full"
+          >
+            <Link
+              to="/photographers"
+              className="px-6 py-3.5 rounded-full bg-[#C85A32] hover:bg-[#B24E2A] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg hover:shadow-[#C85A32]/40 hover:scale-[1.02] flex items-center gap-2 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" /> Browse Active Directory
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!isUserSignedIn()) {
+                  navigate('/auth');
+                  return;
+                }
+                effectiveOpenBooking({
+                  photographer: {
+                    id: id || 'new-artist',
+                    name: artistName,
+                    location: artistLocation,
+                    baseCity: artistLocation.split(',')[0].trim(),
+                    avatar: previewData?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+                    heroImage: previewData?.heroImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+                    primaryCategory: artistCategory,
+                    specialties: [artistCategory],
+                    experienceLevel: 'professional',
+                    experienceYears: 10,
+                    rating: 5.0,
+                    reviewCount: 1,
+                    dayRate: artistDayRate,
+                    halfDayRate: Math.round(artistDayRate * 0.6),
+                    availableNow: true,
+                    nextAvailableDate: new Date().toISOString().split('T')[0],
+                    clientRoster: ['MTShoots Verified'],
+                    bio: artistBio,
+                    awards: ['Verified Artist'],
+                    equipment: ['Professional Camera System'],
+                    cameraFormat: 'High-Resolution Full Frame',
+                    turnaroundDays: artistTurnaround,
+                    assistantIncluded: true,
+                    portfolio: []
+                  },
+                  selectedDate: new Date().toISOString().split('T')[0],
+                  durationType: 'full-day',
+                  usageRights: 'commercial-standard',
+                  selectedAddOns: [],
+                  totalCost: artistDayRate + 5000,
+                  shootLocation: artistLocation
+                });
+              }}
+              className="px-6 py-3.5 rounded-full bg-[#241815] hover:bg-[#36221c] border border-[#422C24] text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Calendar className="w-4 h-4 text-[#C85A32]" /> Request Direct Booking
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof navigator !== 'undefined' && navigator.share) {
+                  navigator.share({
+                    title: `${artistName}  -  MTShoots`,
+                    url: window.location.href
+                  }).catch(() => {});
+                } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard.writeText(window.location.href);
+                  alert('Profile link copied to clipboard!');
+                }
+              }}
+              className="px-5 py-3.5 rounded-full bg-[#241815] hover:bg-[#36221c] border border-[#422C24] text-stone-300 hover:text-white font-semibold text-xs transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              <Share2 className="w-4 h-4 text-[#D9A05B]" /> Share Profile
+            </button>
+          </motion.div>
+        </main>
+
         <Footer />
       </div>
     );
   }
 
-  const isSaved = photographer ? (shortlistIds || []).includes(photographer.id) : false;
+  const isSaved = Boolean(isUserSignedIn() && photographer && (shortlistIds || []).includes(photographer.id));
 
   // Pricing calculations with defensive fallbacks
   const effectiveDayRate = photographer?.dayRate || 25000;
@@ -372,6 +587,10 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
   };
 
   const handleStartBooking = () => {
+    if (!isUserSignedIn()) {
+      navigate('/auth');
+      return;
+    }
     const cost = getPackagePrice(selectedPackage) + 5000; // includes base production
     effectiveOpenBooking({
       photographer,
@@ -409,7 +628,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
       <Navbar />
 
       {/* Breadcrumb + Quick Bar */}
-      <div className="border-b border-[#E7E1DA] bg-white/80 backdrop-blur-md sticky top-16 sm:top-20 z-30">
+      <div className="border-b border-[#E7E1DA] bg-white/95 backdrop-blur-md relative z-10">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2">
           <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm text-[#8a726a] min-w-0">
             <Link to="/photographers" className="hover:text-[#C85A32] flex items-center gap-1 shrink-0">
@@ -426,7 +645,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
           <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
             <button
               type="button"
-              onClick={() => onToggleSave(photographer.id)}
+              onClick={() => handleToggleSave(photographer.id)}
               className={`px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer border ${
                 isSaved
                   ? 'bg-[#EAF4ED] text-[#2D593E] border-[#2D593E]/20'
@@ -457,29 +676,29 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 flex-1 w-full space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12 flex-1 w-full space-y-8">
         {/* ============================================================ */}
         {/* 1. UPPER SIDE: FULL WIDTH ARTIST PROFILE CARD                */}
         {/* ============================================================ */}
-        <section className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E7E1DA] shadow-sm w-full space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+        <section className="bg-white rounded-3xl p-6 sm:p-8 pt-7 sm:pt-9 border border-[#E7E1DA] shadow-sm w-full space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-6">
             <img
               src={photographer.avatar}
               alt={photographer.name}
               onError={(e) => {
                 (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
               }}
-              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[#E7E1DA] shadow-md shrink-0"
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[#E7E1DA] shadow-md shrink-0 ring-1 ring-black/5"
             />
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#fbf2ee] text-[#C85A32] border border-[#dec0b7]">
+              <div className="flex flex-wrap items-center gap-2 mb-2.5 pt-0.5">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#fbf2ee] text-[#C85A32] border border-[#dec0b7] leading-none inline-flex items-center">
                   {photographer.primaryCategory}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#EAF4ED] text-[#2D593E] border border-[#2D593E]/20 flex items-center gap-1">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#EAF4ED] text-[#2D593E] border border-[#2D593E]/20 flex items-center gap-1 leading-none">
                   <ShieldCheck className="w-3.5 h-3.5" /> Verified Artist
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FAF8F5] text-[#57423b] border border-[#E7E1DA]">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FAF8F5] text-[#57423b] border border-[#E7E1DA] leading-none inline-flex items-center">
                   {photographer.experienceYears}+ Years Exp.
                 </span>
               </div>
@@ -779,11 +998,27 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
               </div>
 
               {/* Cost Summary Breakdown */}
-              <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#E7E1DA] space-y-2 text-xs">
+              <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#E7E1DA] space-y-2.5 text-xs">
+                {photographer.packageTitle && (
+                  <div className="pb-2 border-b border-[#E7E1DA]/80">
+                    <span className="text-[10px] uppercase font-bold text-[#8a726a] block">Package Tier</span>
+                    <span className="font-bold text-[#181615] text-sm">{photographer.packageTitle}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-[#57423b]">
                   <span>Photographer Day Rate ({selectedPackage}):</span>
                   <span className="font-semibold text-[#181615]">{formatINR(getPackagePrice(selectedPackage))}</span>
                 </div>
+                <div className="flex justify-between text-[#57423b]">
+                  <span>Delivery Turnaround:</span>
+                  <span className="font-semibold text-[#181615]">{photographer.turnaroundDays || 3} Business Days</span>
+                </div>
+                {photographer.advanceDeposit && (
+                  <div className="flex justify-between text-[#57423b]">
+                    <span>Advance Booking Deposit:</span>
+                    <span className="font-semibold text-[#181615]">{photographer.advanceDeposit}% to secure slot</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-[#57423b]">
                   <span>Studio / Location Assist:</span>
                   <span className="font-semibold text-[#181615]">Included</span>
@@ -796,6 +1031,12 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
                   <span>Total Estimated:</span>
                   <span className="text-[#C85A32]">{formatINR(getPackagePrice(selectedPackage) + 5000)}</span>
                 </div>
+                {photographer.travelPolicy && (
+                  <div className="pt-2 border-t border-[#E7E1DA]/70 text-[11px] text-[#8a726a]">
+                    <span className="font-semibold text-[#57423b]">Travel Policy: </span>
+                    {photographer.travelPolicy}
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -807,7 +1048,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
                   <Calendar className="w-4 h-4" /> Book This Photographer
                 </button>
                 <button
-                  onClick={() => onToggleSave(photographer.id)}
+                  onClick={() => handleToggleSave(photographer.id)}
                   className="w-full py-3 rounded-full bg-[#FAF8F5] hover:bg-[#F4EFEB] text-[#181615] font-semibold text-xs border border-[#E7E1DA] transition-colors cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Heart className={`w-4 h-4 ${isSaved ? 'fill-[#2D593E] text-[#2D593E]' : ''}`} />
@@ -830,9 +1071,25 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
           </div>
         </section>
 
+        <section className="bg-white rounded-3xl border border-[#E7E1DA] shadow-sm p-6 sm:p-8">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8a726a]">Next part</p>
+              <h3 className="font-serif text-2xl font-bold text-[#181615] mt-1">Coming Soon</h3>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-[#FAF8F5] border border-[#E7E1DA] text-xs font-semibold text-[#57423b]">
+              More profile sections in progress
+            </span>
+          </div>
+          <p className="mt-4 text-sm text-[#57423b] leading-relaxed">
+            This photographer profile is live and ready for bookings. Additional storytelling and expanded portfolio sections will be released in the next update.
+          </p>
+        </section>
+
         {/* ============================================================ */}
         {/* 3. SELECTED WORKS AUTO-LOOP SLIDER + HONORS & AWARDS         */}
         {/* ============================================================ */}
+        {Boolean(photographer.portfolio && photographer.portfolio.length > 0) && (
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
           {/* Left: Selected Works Auto-loop Slider with Dots Transition */}
           <div className="lg:col-span-7 xl:col-span-7 flex flex-col">
@@ -999,6 +1256,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
             </div>
           </div>
         </section>
+        )}
 
         {/* ============================================================ */}
         {/* 4. STUDIO MAP & ADDRESS WITH ICON-ONLY CONTROLS INSIDE MAP  */}

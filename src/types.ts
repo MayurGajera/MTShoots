@@ -44,6 +44,10 @@ export interface Photographer {
   homeSliderPhotos?: string[];
   turnaroundDays: number;
   assistantIncluded: boolean;
+  coverImage?: string;
+  packageTitle?: string;
+  advanceDeposit?: number | string;
+  travelPolicy?: string;
 }
 
 export type ShootDurationType = 'half-day' | 'full-day' | 'two-day' | 'three-day';

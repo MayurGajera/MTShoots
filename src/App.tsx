@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { LandingPage } from './pages/LandingPage';
@@ -18,9 +18,9 @@ import { LocationPickerModal } from './components/LocationPickerModal';
 import { ScrollToTop } from './components/ScrollToTop';
 import { ScrollToTopButton } from './components/ScrollToTopButton';
 import { ApertureLoader } from './components/ApertureLoader';
-import { INITIAL_PHOTOGRAPHERS, INITIAL_BOOKINGS, getAllPhotographers } from './data/photographers';
+import { PwaVideoSplash } from './components/PwaVideoSplash';
 import { BookingRequest, Photographer, ShootDurationType, UsageRightsTier } from './types';
-import { isSupabaseConfigured, saveBookingToSupabase } from './lib/supabase';
+import { isSupabaseConfigured, saveBookingToSupabase, loadPhotographers } from './lib/supabase';
 import { useScrollLock } from './hooks/useScrollLock';
 
 // Page transitions variant
@@ -74,7 +74,7 @@ function AnimatedRoutes({
           <Route path="/bookings" element={
             <BookingsPage
               bookings={bookings}
-              photographers={getAllPhotographers()}
+              photographers={[]}
               onOpenNewBooking={openNewBooking}
             />
           } />
@@ -94,15 +94,15 @@ export default function App() {
   const [bookings, setBookings] = useState<BookingRequest[]>(() => {
     try {
       const saved = localStorage.getItem('capturely_bookings');
-      return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
-    } catch { return INITIAL_BOOKINGS; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('capturely_shortlist');
-      return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
-    } catch { return ['darshan-mehta', 'rohan-varma']; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [selectedCity, setSelectedCity] = useState<string>(() => {
@@ -121,7 +121,38 @@ export default function App() {
     shootLocation: string;
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showPwaSplash, setShowPwaSplash] = useState(false);
   const [isAppLoading, setIsAppLoading] = useState(true);
+  const [photographersList, setPhotographersList] = useState<Photographer[]>([]);
+
+  useEffect(() => {
+    // Check if running in PWA standalone display mode on first launch
+    const isPwa =
+      typeof window !== 'undefined' &&
+      (window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true ||
+        document.referrer.includes('android-app://') ||
+        window.location.search.includes('mode=pwa') ||
+        window.location.search.includes('pwa=true'));
+
+    const hasLaunched =
+      typeof window !== 'undefined' ? sessionStorage.getItem('mtshoots_pwa_launched') : null;
+
+    if (isPwa && !hasLaunched) {
+      setShowPwaSplash(true);
+      setIsAppLoading(false);
+    } else {
+      setShowPwaSplash(false);
+      const timer = setTimeout(() => setIsAppLoading(false), 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPhotographers().then(r => {
+      if (r) setPhotographersList(r);
+    }).catch(() => {});
+  }, []);
 
   // Lock body scroll when booking modal is open
   useScrollLock(isBookingModalOpen);
@@ -135,7 +166,6 @@ export default function App() {
     if (!hasCity) {
       setTimeout(() => setShowLocationPicker(true), 1200);
     }
-    setTimeout(() => setIsAppLoading(false), 800);
 
     return () => window.removeEventListener('open-location-picker', handleOpenLoc);
   }, []);
@@ -182,6 +212,21 @@ export default function App() {
     } catch {}
     setShowLocationPicker(false);
   };
+
+  if (showPwaSplash) {
+    return (
+      <PwaVideoSplash
+        videoSrc="/promo.mp4"
+        durationSeconds={6.5}
+        onComplete={() => {
+          try {
+            sessionStorage.setItem('mtshoots_pwa_launched', 'true');
+          } catch {}
+          setShowPwaSplash(false);
+        }}
+      />
+    );
+  }
 
   // App loading screen
   if (isAppLoading) {
@@ -235,7 +280,7 @@ export default function App() {
       {isBookingModalOpen && (
         <BookingSheetModal
           initialConfig={bookingConfig}
-          photographers={getAllPhotographers()}
+          photographers={photographersList}
           onClose={() => { setIsBookingModalOpen(false); setBookingConfig(null); }}
           onConfirmBooking={handleConfirmBooking}
         />

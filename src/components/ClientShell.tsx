@@ -9,13 +9,22 @@ import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { ScrollToTopButton } from '@/components/ScrollToTopButton';
 import { LocationPickerModal } from '@/components/LocationPickerModal';
 import { BookingSheetModal } from '@/components/BookingSheetModal';
-import { INITIAL_PHOTOGRAPHERS, getAllPhotographers } from '@/data/photographers';
+import { loadPhotographers } from '@/lib/supabase';
+import { Photographer } from '@/types';
 import { ApertureLoader } from '@/components/ApertureLoader';
+import { PwaVideoSplash } from '@/components/PwaVideoSplash';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 function InnerShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const isPolicyPage = pathname === '/privacy' || pathname === '/terms' || pathname === '/cancellation';
+  const [photographersList, setPhotographersList] = useState<Photographer[]>([]);
+
+  useEffect(() => {
+    loadPhotographers().then(remote => {
+      if (remote) setPhotographersList(remote);
+    }).catch(() => {});
+  }, []);
 
   const {
     bookings,
@@ -33,13 +42,35 @@ function InnerShell({ children }: { children: React.ReactNode }) {
     handleLocationSelect,
   } = useApp();
 
+  const [showPwaSplash, setShowPwaSplash] = useState(false);
   const [isAppLoading, setIsAppLoading] = useState(true);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
-  }, []);
 
+    // Check if running in PWA standalone display mode on first launch
+    const isPwa =
+      typeof window !== 'undefined' &&
+      (window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true ||
+        document.referrer.includes('android-app://') ||
+        window.location.search.includes('mode=pwa') ||
+        window.location.search.includes('pwa=true'));
+
+    const hasLaunched =
+      typeof window !== 'undefined' ? sessionStorage.getItem('mtshoots_pwa_launched') : null;
+
+    if (isPwa && !hasLaunched) {
+      setShowPwaSplash(true);
+      setIsAppLoading(false);
+    } else {
+      setShowPwaSplash(false);
+      const timer = setTimeout(() => setIsAppLoading(false), 600);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   useEffect(() => {
     const handleOpenLoc = () => setShowLocationPicker(true);
@@ -49,13 +80,26 @@ function InnerShell({ children }: { children: React.ReactNode }) {
     if (!hasCity && !isPolicyPage) {
       setTimeout(() => setShowLocationPicker(true), 1200);
     }
-    const timer = setTimeout(() => setIsAppLoading(false), 600);
 
     return () => {
       window.removeEventListener('open-location-picker', handleOpenLoc);
-      clearTimeout(timer);
     };
   }, [setShowLocationPicker, isPolicyPage]);
+
+  if (showPwaSplash) {
+    return (
+      <PwaVideoSplash
+        videoSrc="/promo.mp4"
+        durationSeconds={6.5}
+        onComplete={() => {
+          try {
+            sessionStorage.setItem('mtshoots_pwa_launched', 'true');
+          } catch {}
+          setShowPwaSplash(false);
+        }}
+      />
+    );
+  }
 
   if (isAppLoading) {
     return (
@@ -99,7 +143,7 @@ function InnerShell({ children }: { children: React.ReactNode }) {
       {isBookingModalOpen && (
         <BookingSheetModal
           initialConfig={bookingConfig}
-          photographers={getAllPhotographers()}
+          photographers={photographersList}
           onClose={() => {
             setIsBookingModalOpen(false);
             setBookingConfig(null);
