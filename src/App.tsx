@@ -57,7 +57,8 @@ function AnimatedRoutes({
       >
         <Routes location={location}>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/photographers" element={<PhotographersPage />} />`n          <Route path="/photographers/apply" element={<PhotographerApplyPage />} />
+          <Route path="/photographers" element={<PhotographersPage />} />
+          <Route path="/photographers/apply" element={<PhotographerApplyPage />} />
           <Route path="/photographers/:id" element={
             <PhotographerProfilePage
               onOpenBooking={onOpenBooking}
@@ -124,6 +125,32 @@ export default function App() {
   const [showPwaSplash, setShowPwaSplash] = useState(false);
   const [isAppLoading, setIsAppLoading] = useState(true);
   const [photographersList, setPhotographersList] = useState<Photographer[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      if (typeof window === 'undefined') return null;
+      const stored = localStorage.getItem('mtshoots_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const syncUser = () => {
+      try {
+        const stored = localStorage.getItem('mtshoots_user');
+        setCurrentUser(stored ? JSON.parse(stored) : null);
+      } catch {
+        setCurrentUser(null);
+      }
+    };
+    window.addEventListener('storage', syncUser);
+    window.addEventListener('mtshoots-auth-changed', syncUser);
+    return () => {
+      window.removeEventListener('storage', syncUser);
+      window.removeEventListener('mtshoots-auth-changed', syncUser);
+    };
+  }, []);
 
   useEffect(() => {
     // Check if running in PWA standalone display mode on first launch
@@ -240,33 +267,6 @@ export default function App() {
       </div>
     );
   }
-
-  const [currentUser, setCurrentUser] = useState<any>(() => {
-    try {
-      if (typeof window === 'undefined') return null;
-      const stored = localStorage.getItem('mtshoots_user');
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    const syncUser = () => {
-      try {
-        const stored = localStorage.getItem('mtshoots_user');
-        setCurrentUser(stored ? JSON.parse(stored) : null);
-      } catch {
-        setCurrentUser(null);
-      }
-    };
-    window.addEventListener('storage', syncUser);
-    window.addEventListener('mtshoots-auth-changed', syncUser);
-    return () => {
-      window.removeEventListener('storage', syncUser);
-      window.removeEventListener('mtshoots-auth-changed', syncUser);
-    };
-  }, []);
 
   const userBookingsCount = React.useMemo(() => {
     if (!currentUser?.email) return 0;
