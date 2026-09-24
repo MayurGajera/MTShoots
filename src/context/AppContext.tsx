@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { BookingRequest, Photographer, ShootDurationType, UsageRightsTier } from '@/types';
-import { INITIAL_BOOKINGS } from '@/data/photographers';
 import { isSupabaseConfigured, saveBookingToSupabase, fetchBookings } from '@/lib/supabase';
 
 export interface BookingConfig {
@@ -41,12 +40,12 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [bookings, setBookings] = useState<BookingRequest[]>(() => {
-    if (typeof window === 'undefined') return INITIAL_BOOKINGS || [];
+    if (typeof window === 'undefined') return [];
     try {
       const saved = localStorage.getItem('capturely_bookings');
-      return saved ? JSON.parse(saved) : (INITIAL_BOOKINGS || []);
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_BOOKINGS || [];
+      return [];
     }
   });
 

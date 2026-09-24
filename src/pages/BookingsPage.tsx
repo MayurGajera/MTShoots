@@ -10,7 +10,6 @@ import { BookingRequest, Photographer } from '../types';
 import { formatINR } from '../utils/format';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
-import { INITIAL_BOOKINGS } from '../data/photographers';
 import { loadPhotographers } from '../lib/supabase';
 import { ShimmerBookingCard } from '../components/ShimmerCard';
 import { PhotographerDashboard } from '../components/PhotographerDashboard';

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   Star,
@@ -14,8 +14,8 @@ import {
   FileText,
   Share2
 } from 'lucide-react';
-import { Photographer, PortfolioItem, ShootDurationType, UsageRightsTier } from '../types';
-import { AVAILABLE_ADDONS } from '../data/photographers';
+import { Photographer, PortfolioItem, ShootDurationType, UsageRightsTier, BookingAddOn } from '../types';
+import { fetchAddOns } from '../lib/supabase';
 import { formatINR } from '../utils/format';
 
 interface PhotographerDetailModalProps {
@@ -51,11 +51,27 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
   const [durationType, setDurationType] = useState<ShootDurationType>('full-day');
   const [usageRights] = useState<UsageRightsTier>('commercial-standard');
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>(['medium-format']);
+  const [addOnsList, setAddOnsList] = useState<BookingAddOn[]>([]);
   const [isCallSheetStripExpanded, setIsCallSheetStripExpanded] = useState(true);
   const [activePortfolioTab, setActivePortfolioTab] = useState<string>('all');
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [shootLocation, setShootLocation] = useState<string>(photographer.officeLocation || photographer.location);
+
+  useEffect(() => {
+    fetchAddOns().then((dbAddOns) => {
+      if (dbAddOns && dbAddOns.length > 0) {
+        setAddOnsList(
+          dbAddOns.map((a) => ({
+            id: a.id,
+            name: a.name,
+            price: a.price,
+            description: a.description || ''
+          }))
+        );
+      }
+    }).catch(() => {});
+  }, []);
 
   const durationMultiplier = durationType === 'half-day' ? 0.6 : durationType === 'full-day' ? 1 : durationType === 'two-day' ? 1.9 : 2.7;
   const baseRate = Math.round(photographer.dayRate * durationMultiplier);
@@ -63,7 +79,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
   const usageCost = Math.round(photographer.dayRate * usageMultiplier);
 
   const addOnsTotal = selectedAddOns.reduce((sum, addOnId) => {
-    const item = AVAILABLE_ADDONS.find((a) => a.id === addOnId);
+    const item = addOnsList.find((a) => a.id === addOnId);
     return sum + (item ? item.price : 0);
   }, 0);
 
@@ -727,7 +743,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
                   Optional Add-Ons (Crew &amp; Equipment)
                 </label>
                 <div className="space-y-1.5">
-                  {AVAILABLE_ADDONS.map((addOn) => {
+                  {addOnsList.map((addOn) => {
                     const isChecked = selectedAddOns.includes(addOn.id);
                     return (
                       <label

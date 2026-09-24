@@ -10,7 +10,6 @@ import { BookingSheetModal } from '../components/BookingSheetModal';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { BookingRequest } from '../types';
-import { INITIAL_BOOKINGS } from '../data/photographers';
 import { PortfolioItem, ShootDurationType, UsageRightsTier } from '../types';
 
 export const SavedPage: React.FC = () => {
@@ -35,8 +34,8 @@ export const SavedPage: React.FC = () => {
     try {
       if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_bookings');
-      return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
-    } catch { return INITIAL_BOOKINGS; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [selectedPhotographer, setSelectedPhotographer] = useState<Photographer | null>(null);

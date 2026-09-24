@@ -6,8 +6,7 @@ import {
   ShieldAlert, Check, ChevronDown, Lock, LogIn, Sparkles, AlertCircle,
   Eye, EyeOff
 } from 'lucide-react';
-import { Photographer, BookingRequest, ShootDurationType, UsageRightsTier } from '../types';
-import { AVAILABLE_ADDONS } from '../data/photographers';
+import { Photographer, BookingRequest, ShootDurationType, UsageRightsTier, BookingAddOn } from '../types';
 import { fetchAddOns, DbAddOn, upsertUser, getUserByEmail } from '@/lib/supabase';
 import { formatINR } from '../utils/format';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -91,7 +90,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
 }) => {
   useScrollLock(true);
 
-  const [addOnsList, setAddOnsList] = useState(AVAILABLE_ADDONS);
+  const [addOnsList, setAddOnsList] = useState<BookingAddOn[]>([]);
 
   useEffect(() => {
     fetchAddOns().then(dbAddOns => {

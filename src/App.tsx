@@ -18,7 +18,6 @@ import { LocationPickerModal } from './components/LocationPickerModal';
 import { ScrollToTop } from './components/ScrollToTop';
 import { ScrollToTopButton } from './components/ScrollToTopButton';
 import { ApertureLoader } from './components/ApertureLoader';
-import { INITIAL_BOOKINGS } from './data/photographers';
 import { BookingRequest, Photographer, ShootDurationType, UsageRightsTier } from './types';
 import { isSupabaseConfigured, saveBookingToSupabase, loadPhotographers } from './lib/supabase';
 import { useScrollLock } from './hooks/useScrollLock';
@@ -94,8 +93,8 @@ export default function App() {
   const [bookings, setBookings] = useState<BookingRequest[]>(() => {
     try {
       const saved = localStorage.getItem('capturely_bookings');
-      return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
-    } catch { return INITIAL_BOOKINGS; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {

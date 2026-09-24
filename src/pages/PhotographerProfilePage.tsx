@@ -9,7 +9,6 @@ import {
   Sliders, ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AVAILABLE_ADDONS } from '../data/photographers';
 import { getPhotographerById } from '../lib/supabase';
 import { ApertureLoader } from '../components/ApertureLoader';
 import { Photographer, PortfolioItem, ShootDurationType, UsageRightsTier } from '../types';

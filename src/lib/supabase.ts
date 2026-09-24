@@ -567,7 +567,6 @@ export interface DbUserDevice {
 
 // ─── Static fallback data ─────────────────────────────────────────────────────
 import { PHOTOGRAPHY_CATEGORIES } from '../data/categories';
-import { AVAILABLE_ADDONS } from '../data/photographers';
 
 const FALLBACK_CITIES = [
   'Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata',
@@ -637,10 +636,7 @@ export async function fetchCitiesWithMeta(): Promise<DbCity[]> {
 
 export async function fetchAddOns(): Promise<DbAddOn[]> {
   const client = getSupabaseClient();
-  if (!client) return AVAILABLE_ADDONS.map((a, i) => ({
-    id: a.id, name: a.name, price: a.price,
-    description: a.description || '', is_active: true, sort_order: i,
-  }));
+  if (!client) return [];
 
   try {
     const { data, error } = await client
@@ -651,10 +647,7 @@ export async function fetchAddOns(): Promise<DbAddOn[]> {
     if (error || !data?.length) throw error || new Error('empty');
     return data;
   } catch {
-    return AVAILABLE_ADDONS.map((a, i) => ({
-      id: a.id, name: a.name, price: a.price,
-      description: a.description || '', is_active: true, sort_order: i,
-    }));
+    return [];
   }
 }
 

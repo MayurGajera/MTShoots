@@ -14,7 +14,6 @@ import { ShimmerCardGrid } from '../components/ShimmerCard';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { BookingRequest, ShootDurationType, UsageRightsTier } from '../types';
-import { INITIAL_BOOKINGS } from '../data/photographers';
 import { PHOTOGRAPHY_CATEGORIES, PhotographyCategory } from '../data/categories';
 import { fetchCategories } from '@/lib/supabase';
 
@@ -70,8 +69,8 @@ export const PhotographersPage: React.FC = () => {
     try {
       if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_bookings');
-      return saved ? JSON.parse(saved) : (INITIAL_BOOKINGS || []);
-    } catch { return INITIAL_BOOKINGS || []; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   // Shortlist
