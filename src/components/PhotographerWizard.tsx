@@ -9,7 +9,7 @@ import { Input } from '../components/ui/input';
 import { saveRegisteredPhotographer } from '../data/photographers';
 import { AvatarPicker } from '../components/AvatarPicker';
 import { savePhotographerToSupabase, upsertUser, deleteSupabaseStorageFileByUrl } from '../lib/supabase';
-import { Photographer, Package, PortfolioItem } from '../types';
+import { Photographer, PortfolioItem } from '../types';
 import { compressImageFile } from '../utils/imageCompressor';
 import {
   Camera,
@@ -687,8 +687,7 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
             phone: phone.trim(),
             avatar_url: avatarUrl,
             city: city,
-            role: 'photographer',
-            password_hash: password
+            role: 'photographer'
           }),
           new Promise((_, reject) => setTimeout(() => reject(new Error('User upsert timeout')), 2500))
         ]);

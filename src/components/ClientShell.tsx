@@ -45,6 +45,41 @@ function InnerShell({ children }: { children: React.ReactNode }) {
   const [showPwaSplash, setShowPwaSplash] = useState(false);
   const [isAppLoading, setIsAppLoading] = useState(true);
 
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      if (typeof window === 'undefined') return null;
+      const stored = localStorage.getItem('mtshoots_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const syncUser = () => {
+      try {
+        const stored = localStorage.getItem('mtshoots_user');
+        setCurrentUser(stored ? JSON.parse(stored) : null);
+      } catch {
+        setCurrentUser(null);
+      }
+    };
+    window.addEventListener('storage', syncUser);
+    window.addEventListener('mtshoots-auth-changed', syncUser);
+    return () => {
+      window.removeEventListener('storage', syncUser);
+      window.removeEventListener('mtshoots-auth-changed', syncUser);
+    };
+  }, []);
+
+  const userBookingsCount = React.useMemo(() => {
+    if (!currentUser?.email) return 0;
+    const email = currentUser.email.toLowerCase();
+    return (bookings || []).filter(b => String(b.artDirectorEmail || '').toLowerCase() === email).length;
+  }, [bookings, currentUser]);
+
+  const userShortlistCount = currentUser ? (shortlistIds || []).length : 0;
+
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -112,41 +147,6 @@ function InnerShell({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
-  const [currentUser, setCurrentUser] = useState<any>(() => {
-    try {
-      if (typeof window === 'undefined') return null;
-      const stored = localStorage.getItem('mtshoots_user');
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    const syncUser = () => {
-      try {
-        const stored = localStorage.getItem('mtshoots_user');
-        setCurrentUser(stored ? JSON.parse(stored) : null);
-      } catch {
-        setCurrentUser(null);
-      }
-    };
-    window.addEventListener('storage', syncUser);
-    window.addEventListener('mtshoots-auth-changed', syncUser);
-    return () => {
-      window.removeEventListener('storage', syncUser);
-      window.removeEventListener('mtshoots-auth-changed', syncUser);
-    };
-  }, []);
-
-  const userBookingsCount = React.useMemo(() => {
-    if (!currentUser?.email) return 0;
-    const email = currentUser.email.toLowerCase();
-    return (bookings || []).filter(b => String(b.artDirectorEmail || '').toLowerCase() === email).length;
-  }, [bookings, currentUser]);
-
-  const userShortlistCount = currentUser ? (shortlistIds || []).length : 0;
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#181615] selection:bg-[#C85A32]/20 selection:text-[#C85A32]">

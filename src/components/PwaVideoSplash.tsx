@@ -61,13 +61,11 @@ export const PwaVideoSplash: React.FC<PwaVideoSplashProps> = ({
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.45, ease: 'easeInOut' }}
-          className="fixed inset-0 z-[99999] bg-[#0d0c0b] flex flex-col items-center justify-center overflow-hidden select-none p-4"
+          className="fixed inset-0 z-[99999] bg-[#0d0c0b] flex items-center justify-center overflow-hidden select-none"
         >
-          {/* Subtle warm ambient glow behind centered video */}
-          <div className="absolute w-72 h-72 rounded-full bg-[#C85A32]/15 blur-3xl pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(200,90,50,0.22),_transparent_38%)]" />
 
-          {/* Centered Video Card - smaller, properly framed in middle, no UI cut off */}
-          <div className="relative z-10 w-full max-w-[330px] sm:max-w-[380px] aspect-square rounded-3xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-white/10 bg-black flex items-center justify-center">
+          <div className="relative z-10 h-full w-full">
             <video
               ref={videoRef}
               src={videoSrc}
@@ -76,7 +74,7 @@ export const PwaVideoSplash: React.FC<PwaVideoSplashProps> = ({
               playsInline
               preload="auto"
               onEnded={handleFinish}
-              className="w-full h-full object-contain"
+              className="h-full w-full object-cover"
             />
           </div>
 
