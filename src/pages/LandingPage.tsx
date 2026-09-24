@@ -188,13 +188,20 @@ export const LandingPage: React.FC = () => {
     try {
       if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_shortlist');
-      return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return ['darshan-mehta', 'rohan-varma'];
+      return [];
     }
   });
 
   const handleToggleShortlist = (id: string) => {
+    try {
+      const user = localStorage.getItem('mtshoots_user');
+      if (!user) {
+        navigate('/auth');
+        return;
+      }
+    } catch {}
     const next = shortlistIds.includes(id)
       ? shortlistIds.filter(x => x !== id)
       : [...shortlistIds, id];

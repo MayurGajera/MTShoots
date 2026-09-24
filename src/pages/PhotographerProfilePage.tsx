@@ -43,6 +43,21 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  const isUserSignedIn = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return !!localStorage.getItem('mtshoots_user');
+    } catch { return false; }
+  };
+
+  const handleToggleSave = (photographerId: string) => {
+    if (!isUserSignedIn()) {
+      navigate('/auth');
+      return;
+    }
+    onToggleSave(photographerId);
+  };
+
   const [photographer, setPhotographer] = useState<Photographer | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(true);
 
@@ -488,6 +503,10 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
             <button
               type="button"
               onClick={() => {
+                if (!isUserSignedIn()) {
+                  navigate('/auth');
+                  return;
+                }
                 effectiveOpenBooking({
                   photographer: {
                     id: id || 'new-artist',
@@ -568,6 +587,10 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
   };
 
   const handleStartBooking = () => {
+    if (!isUserSignedIn()) {
+      navigate('/auth');
+      return;
+    }
     const cost = getPackagePrice(selectedPackage) + 5000; // includes base production
     effectiveOpenBooking({
       photographer,
@@ -622,7 +645,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
           <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
             <button
               type="button"
-              onClick={() => onToggleSave(photographer.id)}
+              onClick={() => handleToggleSave(photographer.id)}
               className={`px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer border ${
                 isSaved
                   ? 'bg-[#EAF4ED] text-[#2D593E] border-[#2D593E]/20'
@@ -1025,7 +1048,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
                   <Calendar className="w-4 h-4" /> Book This Photographer
                 </button>
                 <button
-                  onClick={() => onToggleSave(photographer.id)}
+                  onClick={() => handleToggleSave(photographer.id)}
                   className="w-full py-3 rounded-full bg-[#FAF8F5] hover:bg-[#F4EFEB] text-[#181615] font-semibold text-xs border border-[#E7E1DA] transition-colors cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Heart className={`w-4 h-4 ${isSaved ? 'fill-[#2D593E] text-[#2D593E]' : ''}`} />

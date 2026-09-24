@@ -78,8 +78,8 @@ export const PhotographersPage: React.FC = () => {
     try {
       if (typeof window === 'undefined') return [];
       const saved = localStorage.getItem('capturely_shortlist');
-      return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
-    } catch { return ['darshan-mehta', 'rohan-varma']; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   // UI state
@@ -265,7 +265,19 @@ export const PhotographersPage: React.FC = () => {
     });
   }, [baseCityAndDatePhotographers, searchQuery, selectedCategory, selectedExperience, budgetRange, onlyAvailableNow, onlyTopRated, onlyFastDelivery, onlyAssistantIncluded, sortBy]);
 
+  const isUserSignedIn = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return !!localStorage.getItem('mtshoots_user');
+    } catch { return false; }
+  };
+
   const handleToggleShortlist = (id: string) => {
+    if (!isUserSignedIn()) {
+      triggerToast('Please sign in to save photographers');
+      navigate('/auth');
+      return;
+    }
     if (shortlistIds.includes(id)) {
       setShortlistIds(shortlistIds.filter(x => x !== id));
       triggerToast('Removed from shortlist');
@@ -276,6 +288,11 @@ export const PhotographersPage: React.FC = () => {
   };
 
   const handleQuickBook = (p: Photographer) => {
+    if (!isUserSignedIn()) {
+      triggerToast('Please sign in to book a photoshoot');
+      navigate('/auth');
+      return;
+    }
     setBookingConfig({
       photographer: p,
       selectedDate: targetDate || p.nextAvailableDate,
@@ -289,6 +306,11 @@ export const PhotographersPage: React.FC = () => {
   };
 
   const handleStartBookingFromDetail = (config: typeof bookingConfig) => {
+    if (!isUserSignedIn()) {
+      triggerToast('Please sign in to book a photoshoot');
+      navigate('/auth');
+      return;
+    }
     setBookingConfig(config);
     setSelectedPhotographer(null);
     setIsBookingModalOpen(true);

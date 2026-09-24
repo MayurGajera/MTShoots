@@ -68,12 +68,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return ['darshan-mehta', 'rohan-varma'];
+    if (typeof window === 'undefined') return [];
     try {
       const saved = localStorage.getItem('capturely_shortlist');
-      return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return ['darshan-mehta', 'rohan-varma'];
+      return [];
     }
   });
 
@@ -145,7 +145,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const isUserSignedIn = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return !!localStorage.getItem('mtshoots_user');
+    } catch {
+      return false;
+    }
+  };
+
   const onToggleSave = (id: string) => {
+    if (!isUserSignedIn()) {
+      triggerToast('Please sign in to save photographers');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth';
+      }
+      return;
+    }
     const next = shortlistIds.includes(id)
       ? shortlistIds.filter(x => x !== id)
       : [...shortlistIds, id];
@@ -165,11 +181,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const openBooking = (config: BookingConfig | null) => {
+    if (!isUserSignedIn()) {
+      triggerToast('Please sign in to book a photoshoot');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth';
+      }
+      return;
+    }
     setBookingConfig(config);
     setIsBookingModalOpen(true);
   };
 
   const openNewBooking = () => {
+    if (!isUserSignedIn()) {
+      triggerToast('Please sign in to book a photoshoot');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth';
+      }
+      return;
+    }
     setBookingConfig(null);
     setIsBookingModalOpen(true);
   };

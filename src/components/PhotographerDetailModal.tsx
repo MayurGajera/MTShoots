@@ -94,6 +94,37 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
     }
   };
 
+  const isUserSignedIn = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return !!localStorage.getItem('mtshoots_user');
+    } catch { return false; }
+  };
+
+  const handleToggleSave = () => {
+    if (!isUserSignedIn()) {
+      window.location.href = '/auth';
+      return;
+    }
+    if (onToggleSave) onToggleSave(photographer.id);
+  };
+
+  const handleContinueBooking = () => {
+    if (!isUserSignedIn()) {
+      window.location.href = '/auth';
+      return;
+    }
+    onStartBooking({
+      photographer,
+      selectedDate,
+      durationType,
+      usageRights,
+      selectedAddOns,
+      totalCost,
+      shootLocation
+    });
+  };
+
   const locationOptions = [
     {
       value: photographer.officeLocation || photographer.location,
@@ -230,7 +261,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
             </button>
             <button
               type="button"
-              onClick={() => onToggleSave(photographer.id)}
+              onClick={handleToggleSave}
               className={`p-2 rounded-full border transition-all cursor-pointer ${
                 isSaved
                   ? 'bg-[#C85A32] text-white border-[#C85A32]'
@@ -806,17 +837,7 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
               <button
                 id="request-call-sheet-btn"
                 type="button"
-                onClick={() =>
-                  onStartBooking({
-                    photographer,
-                    selectedDate,
-                    durationType,
-                    usageRights,
-                    selectedAddOns,
-                    totalCost,
-                    shootLocation
-                  })
-                }
+                onClick={handleContinueBooking}
                 className="w-full py-3.5 px-4 rounded-lg bg-[#C85A32] text-white text-sm font-bold uppercase tracking-wider hover:bg-[#B24E2A] transition-all shadow-md active:scale-98 flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <span>Continue to Shoot Details</span>

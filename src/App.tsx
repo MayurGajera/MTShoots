@@ -100,8 +100,8 @@ export default function App() {
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('capturely_shortlist');
-      return saved ? JSON.parse(saved) : ['darshan-mehta', 'rohan-varma'];
-    } catch { return ['darshan-mehta', 'rohan-varma']; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [selectedCity, setSelectedCity] = useState<string>(() => {

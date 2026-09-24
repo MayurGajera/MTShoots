@@ -520,41 +520,42 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>Photographers</span>
               </Link>
 
-              <Link to="/bookings" className={navLinkClass('/bookings')}>
-                <Calendar className="w-3.5 h-3.5 shrink-0" />
-                <span>Bookings</span>
-                {bookingCount > 0 && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    isActive('/bookings') ? 'bg-[#C85A32] text-white' : 'bg-[#C85A32]/15 text-[#C85A32]'
-                  }`}>
-                    {bookingCount}
-                  </span>
-                )}
-              </Link>
+              {user && (
+                <>
+                  <Link to="/bookings" className={navLinkClass('/bookings')}>
+                    <Calendar className="w-3.5 h-3.5 shrink-0" />
+                    <span>Bookings</span>
+                    {bookingCount > 0 && (
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold rounded-full transition-colors leading-none ${
+                          isActive('/bookings')
+                            ? 'bg-[#C85A32] text-white'
+                            : 'bg-[#C85A32]/15 text-[#C85A32]'
+                        }`}
+                      >
+                        {bookingCount}
+                      </span>
+                    )}
+                  </Link>
 
-              <Link to="/saved" className={navLinkClass('/saved')}>
-                <Heart className="w-3.5 h-3.5 shrink-0" />
-                <span>Saved</span>
-                {shortlistCount > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-[#EAF4ED] text-[#2D593E]">
-                    {shortlistCount}
-                  </span>
-                )}
-              </Link>
+                  <Link to="/saved" className={navLinkClass('/saved')}>
+                    <Heart className="w-3.5 h-3.5 shrink-0" />
+                    <span>Saved</span>
+                    {shortlistCount > 0 && (
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold rounded-full transition-colors leading-none ${
+                          isActive('/saved')
+                            ? 'bg-[#2D593E] text-white'
+                            : 'bg-[#EAF4ED] text-[#2D593E]'
+                        }`}
+                      >
+                        {shortlistCount}
+                      </span>
+                    )}
+                  </Link>
+                </>
+              )}
             </nav>
-
-            {/* Book a Shoot CTA */}
-            {onOpenNewBooking && (
-              <Button
-                variant="terracotta"
-                size="sm"
-                onClick={onOpenNewBooking}
-                className="hidden sm:inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 h-8 shadow-sm cursor-pointer hover:scale-[1.02] transition-transform whitespace-nowrap"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Book Shoot</span>
-              </Button>
-            )}
 
             {/* Auth / Profile Hub */}
             {user ? (
@@ -745,37 +746,41 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span className="flex-1 text-left">Photographers Directory</span>
                 </Link>
 
-                <Link
-                  to="/bookings"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-[#FAF8F5] border border-[#E7E1DA]/80 flex items-center justify-center shrink-0 text-[#C85A32]">
-                    <Calendar className="w-4 h-4" />
-                  </div>
-                  <span className="flex-1 text-left">Bookings</span>
-                  {bookingCount > 0 && (
-                    <span className="ml-auto px-2 py-0.5 rounded-full bg-[#FAF8F5] text-xs font-bold text-[#C85A32] border border-[#E7E1DA]">
-                      {bookingCount}
-                    </span>
-                  )}
-                </Link>
+                {user && (
+                  <>
+                    <Link
+                      to="/bookings"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-[#FAF8F5] border border-[#E7E1DA]/80 flex items-center justify-center shrink-0 text-[#C85A32]">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <span className="flex-1 text-left">Bookings</span>
+                      {bookingCount > 0 && (
+                        <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-[#C85A32]/15 text-xs font-bold text-[#C85A32] border border-[#C85A32]/20">
+                          {bookingCount}
+                        </span>
+                      )}
+                    </Link>
 
-                <Link
-                  to="/saved"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-[#FAF8F5] border border-[#E7E1DA]/80 flex items-center justify-center shrink-0 text-[#C85A32]">
-                    <Heart className="w-4 h-4" />
-                  </div>
-                  <span className="flex-1 text-left">Saved Photographers</span>
-                  {shortlistCount > 0 && (
-                    <span className="ml-auto px-2 py-0.5 rounded-full bg-[#FAF8F5] text-xs font-bold text-[#C85A32] border border-[#E7E1DA]">
-                      {shortlistCount}
-                    </span>
-                  )}
-                </Link>
+                    <Link
+                      to="/saved"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-[#FAF8F5] border border-[#E7E1DA]/80 flex items-center justify-center shrink-0 text-[#C85A32]">
+                        <Heart className="w-4 h-4" />
+                      </div>
+                      <span className="flex-1 text-left">Saved Photographers</span>
+                      {shortlistCount > 0 && (
+                        <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-[#2D593E]/15 text-xs font-bold text-[#2D593E] border border-[#2D593E]/20">
+                          {shortlistCount}
+                        </span>
+                      )}
+                    </Link>
+                  </>
+                )}
 
                 <Link
                   to="/photographers/apply"
