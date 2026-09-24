@@ -9,13 +9,15 @@ interface CategoryFlowBarProps {
   onSelectCategory: (categoryName: string) => void;
   photographerCountsByCategory: Record<string, number>;
   totalPhotographersCount?: number;
+  isLoading?: boolean;
 }
 
 export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
   selectedCategory,
   onSelectCategory,
   photographerCountsByCategory,
-  totalPhotographersCount
+  totalPhotographersCount,
+  isLoading = false
 }) => {
   const [categories, setCategories] = useState<PhotographyCategory[]>(PHOTOGRAPHY_CATEGORIES);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
@@ -57,7 +59,13 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
             onClick={() => onSelectCategory('all')}
             className="text-xs font-semibold text-[#C85A32] hover:text-[#9f3c16] hover:underline cursor-pointer shrink-0 ml-2"
           >
-            View All Genres ({totalPhotographersCount ?? photographerCountsByCategory['all'] ?? 14})
+            View All Genres (
+            {isLoading ? (
+              <span className="inline-block w-4 h-2.5 rounded bg-[#E7E1DA] animate-pulse align-middle mx-0.5" />
+            ) : (
+              totalPhotographersCount ?? photographerCountsByCategory['all'] ?? 12
+            )}
+            )
           </button>
         )}
       </div>
@@ -132,10 +140,14 @@ export const CategoryFlowBar: React.FC<CategoryFlowBarProps> = ({
                 >
                   {cat.shortName}
                 </div>
-                <div className="text-[10px] text-[#8a726a] flex items-center space-x-1 mt-0.5">
-                  <span className="tabular-nums font-medium">
-                    {count === 1 ? '1' : count}
-                  </span>
+                <div className="text-[10px] text-[#8a726a] flex items-center space-x-1 mt-0.5 min-h-[14px]">
+                  {isLoading ? (
+                    <span className="inline-block w-3.5 h-2.5 rounded bg-[#E7E1DA] animate-pulse" />
+                  ) : (
+                    <span className="tabular-nums font-medium">
+                      {count === 1 ? '1' : count}
+                    </span>
+                  )}
                 </div>
               </div>
             </button>

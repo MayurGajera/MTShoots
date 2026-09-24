@@ -18,6 +18,7 @@ import { LocationPickerModal } from './components/LocationPickerModal';
 import { ScrollToTop } from './components/ScrollToTop';
 import { ScrollToTopButton } from './components/ScrollToTopButton';
 import { ApertureLoader } from './components/ApertureLoader';
+import { PwaVideoSplash } from './components/PwaVideoSplash';
 import { BookingRequest, Photographer, ShootDurationType, UsageRightsTier } from './types';
 import { isSupabaseConfigured, saveBookingToSupabase, loadPhotographers } from './lib/supabase';
 import { useScrollLock } from './hooks/useScrollLock';
@@ -120,8 +121,32 @@ export default function App() {
     shootLocation: string;
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showPwaSplash, setShowPwaSplash] = useState(false);
   const [isAppLoading, setIsAppLoading] = useState(true);
   const [photographersList, setPhotographersList] = useState<Photographer[]>([]);
+
+  useEffect(() => {
+    // Check if running in PWA standalone display mode on first launch
+    const isPwa =
+      typeof window !== 'undefined' &&
+      (window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true ||
+        document.referrer.includes('android-app://') ||
+        window.location.search.includes('mode=pwa') ||
+        window.location.search.includes('pwa=true'));
+
+    const hasLaunched =
+      typeof window !== 'undefined' ? sessionStorage.getItem('mtshoots_pwa_launched') : null;
+
+    if (isPwa && !hasLaunched) {
+      setShowPwaSplash(true);
+      setIsAppLoading(false);
+    } else {
+      setShowPwaSplash(false);
+      const timer = setTimeout(() => setIsAppLoading(false), 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   useEffect(() => {
     loadPhotographers().then(r => {
@@ -141,7 +166,6 @@ export default function App() {
     if (!hasCity) {
       setTimeout(() => setShowLocationPicker(true), 1200);
     }
-    setTimeout(() => setIsAppLoading(false), 800);
 
     return () => window.removeEventListener('open-location-picker', handleOpenLoc);
   }, []);
@@ -188,6 +212,21 @@ export default function App() {
     } catch {}
     setShowLocationPicker(false);
   };
+
+  if (showPwaSplash) {
+    return (
+      <PwaVideoSplash
+        videoSrc="/promo.mp4"
+        durationSeconds={6.5}
+        onComplete={() => {
+          try {
+            sessionStorage.setItem('mtshoots_pwa_launched', 'true');
+          } catch {}
+          setShowPwaSplash(false);
+        }}
+      />
+    );
+  }
 
   // App loading screen
   if (isAppLoading) {

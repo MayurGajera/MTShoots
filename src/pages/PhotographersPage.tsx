@@ -374,6 +374,7 @@ export const PhotographersPage: React.FC = () => {
           onSelectCategory={setSelectedCategory}
           photographerCountsByCategory={photographerCountsByCategory}
           totalPhotographersCount={baseCityAndDatePhotographers.length}
+          isLoading={isLoading}
         />
 
         {targetDate && (
@@ -427,6 +428,7 @@ export const PhotographersPage: React.FC = () => {
           totalResults={filteredPhotographers.length}
           totalCount={baseCityAndDatePhotographers.length}
           onResetFilters={handleResetFilters}
+          isLoading={isLoading}
         />
 
         {isLoading ? (

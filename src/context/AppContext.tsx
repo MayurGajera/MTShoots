@@ -17,6 +17,7 @@ export interface BookingConfig {
 interface AppContextType {
   bookings: BookingRequest[];
   setBookings: React.Dispatch<React.SetStateAction<BookingRequest[]>>;
+  isBookingsLoading: boolean;
   shortlistIds: string[];
   setShortlistIds: React.Dispatch<React.SetStateAction<string[]>>;
   onToggleSave: (id: string) => void;
@@ -48,6 +49,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return [];
     }
   });
+  const [isBookingsLoading, setIsBookingsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,6 +61,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.warn('Could not load remote bookings from Supabase:', err);
+      } finally {
+        if (isMounted) {
+          setIsBookingsLoading(false);
+        }
       }
     }
     loadDbBookings();
@@ -218,6 +224,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         bookings,
         setBookings,
+        isBookingsLoading,
         shortlistIds,
         setShortlistIds,
         onToggleSave,
@@ -245,6 +252,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 const defaultAppContext: AppContextType = {
   bookings: [],
   setBookings: () => {},
+  isBookingsLoading: false,
   shortlistIds: [],
   setShortlistIds: () => {},
   onToggleSave: () => {},

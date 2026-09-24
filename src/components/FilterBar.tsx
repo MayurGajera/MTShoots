@@ -45,6 +45,7 @@ interface FilterBarProps {
   totalResults: number;
   totalCount: number;
   onResetFilters: () => void;
+  isLoading?: boolean;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -71,7 +72,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   cities,
   totalResults,
   totalCount,
-  onResetFilters
+  onResetFilters,
+  isLoading = false
 }) => {
   const [categoriesList, setCategoriesList] = useState<PhotographyCategory[]>(PHOTOGRAPHY_CATEGORIES);
 
@@ -322,8 +324,15 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <span>Reset ({activeCount})</span>
             </button>
           ) : (
-            <span className="text-[11px] text-[#8a726a] px-1">
-              Showing {totalResults} of {totalCount}
+            <span className="text-[11px] text-[#8a726a] px-1 min-w-[90px] inline-flex items-center">
+              {isLoading ? (
+                <span className="inline-flex items-center gap-1">
+                  <span>Showing</span>
+                  <span className="inline-block w-12 h-2.5 rounded bg-[#E7E1DA] animate-pulse" />
+                </span>
+              ) : (
+                `Showing ${totalResults} of ${totalCount}`
+              )}
             </span>
           )}
         </div>

@@ -32,12 +32,14 @@ import { Input } from './ui/input';
 import { MTShootsLogo } from './MTShootsLogo';
 import { AvatarPicker } from './AvatarPicker';
 import { getUserByEmail, upsertUser, savePhotographerToSupabase, getUserAddresses, addUserAddress, deleteUserAddress, getUserDevices, deactivateDevice, DbUserAddress, DbUserDevice } from '@/lib/supabase';
+import { useApp } from '@/context/AppContext';
 
 interface NavbarProps {
   currentTab?: 'roster' | 'callsheets' | 'shortlist';
   setCurrentTab?: (tab: 'roster' | 'callsheets' | 'shortlist') => void;
   bookingCount?: number;
   shortlistCount?: number;
+  isLoading?: boolean;
   onOpenNewBooking?: () => void;
   onOpenLocationPicker?: () => void;
 }
@@ -53,13 +55,19 @@ interface UserProfile {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  bookingCount = 0,
-  shortlistCount = 0,
+  bookingCount: propBookingCount,
+  shortlistCount: propShortlistCount,
+  isLoading: propIsLoading,
   onOpenNewBooking,
   onOpenLocationPicker
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const appContext = useApp();
+
+  const isBookingsLoading = propIsLoading !== undefined ? propIsLoading : appContext?.isBookingsLoading;
+  const bookingCount = propBookingCount !== undefined ? propBookingCount : (appContext?.bookings?.length || 0);
+  const shortlistCount = propShortlistCount !== undefined ? propShortlistCount : (appContext?.shortlistIds?.length || 0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -525,7 +533,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <Link to="/bookings" className={navLinkClass('/bookings')}>
                     <Calendar className="w-3.5 h-3.5 shrink-0" />
                     <span>Bookings</span>
-                    {bookingCount > 0 && (
+                    {isBookingsLoading ? (
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#C85A32]/20 animate-pulse shrink-0" />
+                    ) : bookingCount > 0 ? (
                       <span
                         className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold rounded-full transition-colors leading-none ${
                           isActive('/bookings')
@@ -535,7 +545,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       >
                         {bookingCount}
                       </span>
-                    )}
+                    ) : null}
                   </Link>
 
                   <Link to="/saved" className={navLinkClass('/saved')}>
@@ -757,11 +767,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <Calendar className="w-4 h-4" />
                       </div>
                       <span className="flex-1 text-left">Bookings</span>
-                      {bookingCount > 0 && (
+                      {isBookingsLoading ? (
+                        <span className="ml-auto w-4 h-4 rounded-full bg-[#C85A32]/20 animate-pulse shrink-0" />
+                      ) : bookingCount > 0 ? (
                         <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-[#C85A32]/15 text-xs font-bold text-[#C85A32] border border-[#C85A32]/20">
                           {bookingCount}
                         </span>
-                      )}
+                      ) : null}
                     </Link>
 
                     <Link

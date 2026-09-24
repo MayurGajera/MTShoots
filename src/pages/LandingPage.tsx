@@ -11,6 +11,7 @@ import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { MTShootsLogo } from '../components/MTShootsLogo';
 import { PhotographerCard } from '../components/PhotographerCard';
+import { ShimmerCard } from '../components/ShimmerCard';
 import { Photographer } from '../types';
 import { loadPhotographers, isSupabaseConfigured } from '../lib/supabase';
 import { fetchCategories, fetchTestimonials } from '@/lib/supabase';
@@ -248,6 +249,7 @@ export const LandingPage: React.FC = () => {
   };
 
   const [allPhotographersList, setAllPhotographersList] = useState<Photographer[]>([]);
+  const [isLoadingPhotographers, setIsLoadingPhotographers] = useState(true);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -261,7 +263,9 @@ export const LandingPage: React.FC = () => {
       if (remote) {
         setAllPhotographersList(remote);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      setIsLoadingPhotographers(false);
+    });
 
     return () => window.removeEventListener('photographers-updated', handleUpdate);
   }, []);
@@ -530,32 +534,45 @@ export const LandingPage: React.FC = () => {
             to="/photographers"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#181615] text-white text-xs font-semibold hover:bg-[#C85A32] transition-colors self-start sm:self-auto cursor-pointer"
           >
-            <span>View All Photographers ({allPhotographersList.length})</span>
+            <span>View All Photographers</span>
+            {isLoadingPhotographers ? (
+              <span className="w-5 h-3.5 bg-white/20 animate-pulse rounded inline-block" />
+            ) : (
+              <span>({allPhotographersList.length})</span>
+            )}
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
 
         {/* Responsive Cards: Swipeable Carousel on Mobile, Grid on Tablet/Desktop */}
-        <div
-          ref={featuredScrollRef}
-          onScroll={handleFeaturedScroll}
-          className={`flex overflow-x-auto snap-x snap-mandatory gap-5 pb-4 pt-1 px-4 -mx-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:grid md:grid-cols-2 ${featuredPhotographers.length >= 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-3'} md:gap-8 md:overflow-visible no-scrollbar`}
-        >
-          {featuredPhotographers.map(p => (
-            <div
-              key={p.id}
-              className="w-[85vw] max-w-[340px] shrink-0 snap-center md:w-auto md:max-w-none md:shrink md:snap-none flex flex-col"
-            >
-              <PhotographerCard
-                photographer={p}
-                onSelect={() => navigate(`/photographers/${p.id}`)}
-                onQuickBook={() => navigate(`/photographers/${p.id}`)}
-                isSaved={shortlistIds.includes(p.id)}
-                onToggleSave={handleToggleShortlist}
-              />
-            </div>
-          ))}
-        </div>
+        {isLoadingPhotographers ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-8">
+            <ShimmerCard />
+            <ShimmerCard />
+            <ShimmerCard />
+          </div>
+        ) : (
+          <div
+            ref={featuredScrollRef}
+            onScroll={handleFeaturedScroll}
+            className={`flex overflow-x-auto snap-x snap-mandatory gap-5 pb-4 pt-1 px-4 -mx-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:grid md:grid-cols-2 ${featuredPhotographers.length >= 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-3'} md:gap-8 md:overflow-visible no-scrollbar`}
+          >
+            {featuredPhotographers.map(p => (
+              <div
+                key={p.id}
+                className="w-[85vw] max-w-[340px] shrink-0 snap-center md:w-auto md:max-w-none md:shrink md:snap-none flex flex-col"
+              >
+                <PhotographerCard
+                  photographer={p}
+                  onSelect={() => navigate(`/photographers/${p.id}`)}
+                  onQuickBook={() => navigate(`/photographers/${p.id}`)}
+                  isSaved={shortlistIds.includes(p.id)}
+                  onToggleSave={handleToggleShortlist}
+                />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Mobile Carousel Indicators (Only when multiple cards exist) */}
         {featuredPhotographers.length > 1 && (
