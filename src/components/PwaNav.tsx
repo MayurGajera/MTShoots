@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Camera, Calendar, Heart, PlusCircle, Home } from 'lucide-react';
 import { Link, useLocation } from '@/lib/navigation';
 
@@ -17,6 +17,37 @@ export const PwaNav: React.FC<PwaNavProps> = ({
   onOpenNewBooking
 }) => {
   const location = useLocation();
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      if (typeof window === 'undefined') return null;
+      const stored = localStorage.getItem('mtshoots_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const syncUser = () => {
+      try {
+        const stored = localStorage.getItem('mtshoots_user');
+        setCurrentUser(stored ? JSON.parse(stored) : null);
+      } catch {
+        setCurrentUser(null);
+      }
+    };
+    window.addEventListener('storage', syncUser);
+    window.addEventListener('mtshoots-auth-changed', syncUser);
+    return () => {
+      window.removeEventListener('storage', syncUser);
+      window.removeEventListener('mtshoots-auth-changed', syncUser);
+    };
+  }, []);
+
+  const isUserSignedIn = Boolean(currentUser);
+  const showBookingBadge = isUserSignedIn && bookingCount > 0;
+  const showShortlistBadge = isUserSignedIn && shortlistCount > 0;
+
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   const tabClass = (path: string) =>
@@ -66,7 +97,7 @@ export const PwaNav: React.FC<PwaNavProps> = ({
         <Link to="/bookings" className={tabClass('/bookings')} aria-label="My bookings">
           <div className="relative">
             <Calendar className="w-5 h-5" />
-            {bookingCount > 0 && (
+            {showBookingBadge && (
               <span className="absolute -top-1.5 -right-2.5 w-4 h-4 rounded-full bg-[#C85A32] text-white text-[9px] font-bold flex items-center justify-center">
                 {bookingCount}
               </span>
@@ -82,7 +113,7 @@ export const PwaNav: React.FC<PwaNavProps> = ({
         <Link to="/saved" className={tabClass('/saved')} aria-label="Saved photographers">
           <div className="relative">
             <Heart className="w-5 h-5" />
-            {shortlistCount > 0 && (
+            {showShortlistBadge && (
               <span className="absolute -top-1.5 -right-2.5 w-4 h-4 rounded-full bg-[#4A7C59] text-white text-[9px] font-bold flex items-center justify-center">
                 {shortlistCount}
               </span>

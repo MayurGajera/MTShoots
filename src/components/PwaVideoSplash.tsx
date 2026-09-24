@@ -61,18 +61,24 @@ export const PwaVideoSplash: React.FC<PwaVideoSplashProps> = ({
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.45, ease: 'easeInOut' }}
-          className="fixed inset-0 z-[99999] bg-black flex items-center justify-center overflow-hidden select-none"
+          className="fixed inset-0 z-[99999] bg-[#0d0c0b] flex flex-col items-center justify-center overflow-hidden select-none p-4"
         >
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            autoPlay
-            muted={isMuted}
-            playsInline
-            preload="auto"
-            onEnded={handleFinish}
-            className="w-full h-full object-cover"
-          />
+          {/* Subtle warm ambient glow behind centered video */}
+          <div className="absolute w-72 h-72 rounded-full bg-[#C85A32]/15 blur-3xl pointer-events-none" />
+
+          {/* Centered Video Card - smaller, properly framed in middle, no UI cut off */}
+          <div className="relative z-10 w-full max-w-[330px] sm:max-w-[380px] aspect-square rounded-3xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-white/10 bg-black flex items-center justify-center">
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              autoPlay
+              muted={isMuted}
+              playsInline
+              preload="auto"
+              onEnded={handleFinish}
+              className="w-full h-full object-contain"
+            />
+          </div>
 
           {/* Top controls: Mute toggle & Skip button */}
           <div className="absolute top-6 right-6 z-20 flex items-center gap-2.5">
@@ -97,7 +103,7 @@ export const PwaVideoSplash: React.FC<PwaVideoSplashProps> = ({
 
           {/* Bottom branding overlay */}
           <div className="absolute bottom-8 inset-x-0 text-center z-20 pointer-events-none px-4">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/50 backdrop-blur-md border border-white/15 text-white/90 text-xs font-semibold shadow-xl">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-white/90 text-xs font-semibold shadow-xl">
               <span className="w-2 h-2 rounded-full bg-[#C85A32] animate-pulse" />
               <span>MTShoots Verified Photography Network</span>
             </div>
