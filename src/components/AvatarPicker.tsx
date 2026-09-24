@@ -1,7 +1,8 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, User, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface AvatarPickerProps {
   value: string;
@@ -22,27 +23,28 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     setError(null);
     if (!file.type.startsWith('image/')) {
       setError('Please select an image file (JPG, PNG, or WebP).');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image size must be less than 5MB.');
+    if (file.size > 15 * 1024 * 1024) {
+      setError('Image size must be less than 15MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        onChange(reader.result);
+    try {
+      // Compress to 600px max dimension, quality 0.82
+      const compressedUrl = await compressImageFile(file, 600, 0.82);
+      if (compressedUrl) {
+        onChange(compressedUrl);
+      } else {
+        setError('Failed to process image file. Please try another image.');
       }
-    };
-    reader.onerror = () => {
+    } catch {
       setError('Failed to read image file. Please try again.');
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

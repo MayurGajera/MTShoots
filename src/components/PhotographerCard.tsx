@@ -26,17 +26,20 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  // Build slider images from homeSliderPhotos, fallback to heroImage + portfolio items
+  // Build slider images combining all available portfolio images and slider photos
   const sliderImages: string[] = React.useMemo(() => {
     const rawList: string[] = [];
+
+    // Prioritize uploaded portfolio images so all 3-4 images appear in card slider
+    if (photographer.portfolio && photographer.portfolio.length > 0) {
+      rawList.push(...photographer.portfolio.map(p => p.imageUrl));
+    }
     if (photographer.homeSliderPhotos && photographer.homeSliderPhotos.length > 0) {
       rawList.push(...photographer.homeSliderPhotos);
-    } else {
-      if (photographer.heroImage) rawList.push(photographer.heroImage);
-      if (photographer.portfolio && photographer.portfolio.length > 0) {
-        rawList.push(...photographer.portfolio.map(p => p.imageUrl));
-      }
     }
+    if (photographer.heroImage) rawList.push(photographer.heroImage);
+    if (photographer.coverImage) rawList.push(photographer.coverImage);
+
     const seen = new Set<string>();
     const result: string[] = [];
     for (const img of rawList) {
@@ -45,7 +48,7 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
         result.push(img);
       }
     }
-    return result.length > 0 ? result : [photographer.heroImage];
+    return result.length > 0 ? result : [photographer.heroImage || photographer.avatar];
   }, [photographer]);
 
   const [currentIndex, setCurrentIndex] = useState(0);

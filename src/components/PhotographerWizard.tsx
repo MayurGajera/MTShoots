@@ -10,6 +10,7 @@ import { saveRegisteredPhotographer } from '../data/photographers';
 import { AvatarPicker } from '../components/AvatarPicker';
 import { savePhotographerToSupabase, upsertUser, deleteSupabaseStorageFileByUrl } from '../lib/supabase';
 import { Photographer, Package, PortfolioItem } from '../types';
+import { compressImageFile } from '../utils/imageCompressor';
 import {
   Camera,
   User,
@@ -126,6 +127,7 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [isSubmittedComingSoon, setIsSubmittedComingSoon] = useState<boolean>(false);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [publishedSlug, setPublishedSlug] = useState<string>('');
 
@@ -468,24 +470,33 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
 
     const filesToAdd = validFiles.slice(0, remainingSlots);
 
-    filesToAdd.forEach((file, index) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result !== 'string') return;
+    // Concurrently compress images to keep storage payload small and prevent QuotaExceededError
+    Promise.all(
+      filesToAdd.map(async (file, index) => {
+        const compressedUrl = await compressImageFile(file, 1200, 0.8);
+        if (!compressedUrl) return null;
 
         const cleanCaption = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        return {
+          id: 'photo-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5) + '-' + index,
+          url: compressedUrl,
+          caption: cleanCaption || 'Portfolio Photo',
+          tag: primaryGenre,
+          isCover: false,
+        };
+      })
+    ).then((newPhotos) => {
+      const valid = newPhotos.filter((p): p is UploadedPhoto => Boolean(p));
+      if (valid.length > 0) {
         setPortfolioPhotos(prev => {
-          const nextList = [...prev, {
-            id: 'photo-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
-            url: reader.result as string,
-            caption: cleanCaption || 'Portfolio Photo',
-            tag: primaryGenre,
-            isCover: prev.length === 0 && index === 0,
-          }];
-          return nextList;
+          const hasCover = prev.some(p => p.isCover);
+          const adjusted = valid.map((p, i) => ({
+            ...p,
+            isCover: !hasCover && i === 0
+          }));
+          return [...prev, ...adjusted];
         });
-      };
-      reader.readAsDataURL(file);
+      }
     });
 
     e.target.value = '';
@@ -538,13 +549,10 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
       if (avatarUrl) {
         await deleteSupabaseStorageFileByUrl(avatarUrl);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setAvatarUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImageFile(file, 600, 0.82);
+      if (compressed) {
+        setAvatarUrl(compressed);
+      }
     }
   };
 
@@ -645,8 +653,8 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
       travelPolicy: travelCostPolicy || 'Client covers travel & accommodation for outstation bookings',
       assistantIncluded: true,
       portfolio: portfolioItems,
-      homeSliderPhotos: portfolioPhotos.slice(0, 4).map((photo) => photo.url).length > 0
-        ? portfolioPhotos.slice(0, 4).map((photo) => photo.url)
+      homeSliderPhotos: portfolioPhotos.length > 0
+        ? portfolioPhotos.map((photo) => photo.url)
         : [coverPhoto],
       officeLocation: city ? `${city}, India` : 'India',
       officeAddress: city ? `${city}, India` : 'India',
@@ -654,20 +662,12 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
     };
 
     try {
-      // 1. Immediately persist locally so the newly published artist is accessible right away
+      // 1. Immediately persist locally so the newly published artist is accessible in directory
       saveRegisteredPhotographer(photographerProfile);
-      const userObject = {
-        id: 'usr-' + Date.now(),
-        fullName: brandName || fullName,
-        email: email.trim().toLowerCase(),
-        role: 'photographer',
-        photographer_id: uniqueSlug,
-        phone: phone.trim(),
-        city: city,
-        avatar: avatarUrl || ''
-      };
-      localStorage.setItem('mtshoots_user', JSON.stringify(userObject));
-      localStorage.setItem('mtshoots_photographer_profile', JSON.stringify(photographerProfile));
+
+      // Make sure user is NOT logged in automatically and header remains guest view
+      localStorage.removeItem('mtshoots_user');
+      localStorage.removeItem('mtshoots_photographer_profile');
 
       // 2. Persist to Supabase DB with a safety timeout race so it never blocks or hangs
       try {
@@ -694,31 +694,66 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
         ]);
       } catch {}
 
-      window.dispatchEvent(new CustomEvent('mtshoots-auth-changed'));
+      // Notify directory listeners that photographers updated
       window.dispatchEvent(new CustomEvent('photographers-updated'));
       setPublishedSlug(uniqueSlug);
 
-      if (typeof onSuccessRedirect === 'function') {
-        onSuccessRedirect(uniqueSlug);
-        return;
-      }
+      // Smooth loading transition before showing Coming Soon
+      await new Promise(r => setTimeout(r, 600));
 
-      // 3. Immediately open the new photographer profile page listing all details!
-      navigate(`/photographers/${uniqueSlug}`);
-      // Fallback direct redirection in case route transition is blocked
-      setTimeout(() => {
-        if (window.location.pathname !== `/photographers/${uniqueSlug}`) {
-          window.location.href = `/photographers/${uniqueSlug}`;
-        }
-      }, 300);
+      setIsSubmittedComingSoon(true);
     } catch (err: any) {
       console.error('Publish photographer error:', err);
-      // Fallback navigation so user is never stuck
-      window.location.href = `/photographers/${uniqueSlug}`;
+      setIsSubmittedComingSoon(true);
     } finally {
       setIsPublishing(false);
     }
   };
+
+  if (isSubmittedComingSoon) {
+    return (
+      <div className={hideHeader ? "w-full text-[#181615]" : "min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col"}>
+        {!hideHeader && <Navbar />}
+
+        <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-16 sm:py-24">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="bg-white rounded-3xl p-8 sm:p-12 border border-[#E7E1DA] shadow-xl max-w-lg w-full text-center space-y-6"
+          >
+            <div className="w-20 h-20 rounded-full bg-[#fbf2ee] border border-[#dec0b7] text-[#C85A32] flex items-center justify-center mx-auto shadow-inner">
+              <Sparkles className="w-10 h-10 animate-pulse" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#EAF4ED] text-[#2D593E] text-xs font-bold uppercase tracking-wider border border-[#C6E1CD]">
+                MTShoots Verified Network
+              </span>
+              <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#181615]">
+                Coming Soon
+              </h1>
+              <p className="text-sm text-[#8a726a] leading-relaxed max-w-md mx-auto">
+                Thank you for applying. Your photographer application has been received and is being curated. Full public booking access will be available soon.
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-[#E7E1DA]">
+              <Button
+                onClick={() => navigate('/')}
+                className="w-full sm:w-auto min-w-[200px] bg-[#181615] hover:bg-[#C85A32] text-white font-bold text-xs py-3.5 px-8 rounded-full shadow-md transition-all cursor-pointer inline-flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Home</span>
+              </Button>
+            </div>
+          </motion.div>
+        </main>
+
+        {!hideHeader && <Footer />}
+      </div>
+    );
+  }
 
   return (
     <div className={hideHeader ? "w-full text-[#181615]" : "min-h-screen bg-[#FAF8F5] text-[#181615] flex flex-col"}>

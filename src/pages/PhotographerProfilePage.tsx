@@ -640,7 +640,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
       <Navbar />
 
       {/* Breadcrumb + Quick Bar */}
-      <div className="border-b border-[#E7E1DA] bg-white/80 backdrop-blur-md sticky top-16 sm:top-20 z-30">
+      <div className="border-b border-[#E7E1DA] bg-white/95 backdrop-blur-md relative z-10">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2">
           <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm text-[#8a726a] min-w-0">
             <Link to="/photographers" className="hover:text-[#C85A32] flex items-center gap-1 shrink-0">
@@ -688,29 +688,29 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 flex-1 w-full space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12 flex-1 w-full space-y-8">
         {/* ============================================================ */}
         {/* 1. UPPER SIDE: FULL WIDTH ARTIST PROFILE CARD                */}
         {/* ============================================================ */}
-        <section className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E7E1DA] shadow-sm w-full space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+        <section className="bg-white rounded-3xl p-6 sm:p-8 pt-7 sm:pt-9 border border-[#E7E1DA] shadow-sm w-full space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-6">
             <img
               src={photographer.avatar}
               alt={photographer.name}
               onError={(e) => {
                 (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
               }}
-              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[#E7E1DA] shadow-md shrink-0"
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[#E7E1DA] shadow-md shrink-0 ring-1 ring-black/5"
             />
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#fbf2ee] text-[#C85A32] border border-[#dec0b7]">
+              <div className="flex flex-wrap items-center gap-2 mb-2.5 pt-0.5">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#fbf2ee] text-[#C85A32] border border-[#dec0b7] leading-none inline-flex items-center">
                   {photographer.primaryCategory}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#EAF4ED] text-[#2D593E] border border-[#2D593E]/20 flex items-center gap-1">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#EAF4ED] text-[#2D593E] border border-[#2D593E]/20 flex items-center gap-1 leading-none">
                   <ShieldCheck className="w-3.5 h-3.5" /> Verified Artist
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FAF8F5] text-[#57423b] border border-[#E7E1DA]">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FAF8F5] text-[#57423b] border border-[#E7E1DA] leading-none inline-flex items-center">
                   {photographer.experienceYears}+ Years Exp.
                 </span>
               </div>
@@ -1101,6 +1101,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
         {/* ============================================================ */}
         {/* 3. SELECTED WORKS AUTO-LOOP SLIDER + HONORS & AWARDS         */}
         {/* ============================================================ */}
+        {Boolean(photographer.portfolio && photographer.portfolio.length > 0) && (
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
           {/* Left: Selected Works Auto-loop Slider with Dots Transition */}
           <div className="lg:col-span-7 xl:col-span-7 flex flex-col">
@@ -1267,6 +1268,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
             </div>
           </div>
         </section>
+        )}
 
         {/* ============================================================ */}
         {/* 4. STUDIO MAP & ADDRESS WITH ICON-ONLY CONTROLS INSIDE MAP  */}
