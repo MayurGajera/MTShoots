@@ -214,16 +214,39 @@ export const PhotographerCard: React.FC<PhotographerCardProps> = ({
             </span>
           )}
 
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onToggleSave(photographer.id); }}
-            title={isSaved ? 'Remove from Saved' : 'Save Photographer'}
-            className={`pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all cursor-pointer shadow-md ${
-              isSaved ? 'bg-[#C85A32] text-white scale-105' : 'bg-black/40 text-white hover:bg-black/60 hover:scale-105'
-            }`}
-          >
-            <Heart className={`w-3.5 h-3.5 transition-transform ${isSaved ? 'fill-current' : ''}`} />
-          </button>
+          {(() => {
+            const isUserSignedIn = () => {
+              try {
+                if (typeof window === 'undefined') return false;
+                return !!localStorage.getItem('mtshoots_user');
+              } catch {
+                return false;
+              }
+            };
+            const isActuallySaved = Boolean(isSaved && isUserSignedIn());
+
+            const handleHeartClick = (e: React.MouseEvent) => {
+              e.stopPropagation();
+              if (!isUserSignedIn()) {
+                navigate('/auth');
+                return;
+              }
+              onToggleSave(photographer.id);
+            };
+
+            return (
+              <button
+                type="button"
+                onClick={handleHeartClick}
+                title={isActuallySaved ? 'Remove from Saved' : 'Save Photographer'}
+                className={`pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all cursor-pointer shadow-md ${
+                  isActuallySaved ? 'bg-[#C85A32] text-white scale-105' : 'bg-black/40 text-white hover:bg-black/60 hover:scale-105'
+                }`}
+              >
+                <Heart className={`w-3.5 h-3.5 transition-transform ${isActuallySaved ? 'fill-current' : ''}`} />
+              </button>
+            );
+          })()}
         </div>
 
         {/* ── Bottom: Location + Rating ── */}

@@ -76,12 +76,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
+      const user = localStorage.getItem('mtshoots_user');
+      if (!user) return [];
       const saved = localStorage.getItem('capturely_shortlist');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
   });
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      try {
+        const user = localStorage.getItem('mtshoots_user');
+        if (!user) {
+          setShortlistIds([]);
+          return;
+        }
+        const saved = localStorage.getItem('capturely_shortlist');
+        setShortlistIds(saved ? JSON.parse(saved) : []);
+      } catch {
+        setShortlistIds([]);
+      }
+    };
+    window.addEventListener('storage', handleAuthChange);
+    window.addEventListener('mtshoots-auth-changed', handleAuthChange);
+    return () => {
+      window.removeEventListener('storage', handleAuthChange);
+      window.removeEventListener('mtshoots-auth-changed', handleAuthChange);
+    };
+  }, []);
 
   const [selectedCity, setSelectedCity] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
@@ -225,7 +249,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         bookings,
         setBookings,
         isBookingsLoading,
-        shortlistIds,
+        shortlistIds: isUserSignedIn() ? shortlistIds : [],
         setShortlistIds,
         onToggleSave,
         selectedCity,

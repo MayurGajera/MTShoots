@@ -184,16 +184,41 @@ export const LandingPage: React.FC = () => {
     return d.toISOString().split('T')[0];
   });
 
-  // Shortlist state for featured cards
+  // Shortlist state for featured cards (only for signed-in users)
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     try {
       if (typeof window === 'undefined') return [];
+      const user = localStorage.getItem('mtshoots_user');
+      if (!user) return [];
       const saved = localStorage.getItem('capturely_shortlist');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
   });
+
+  useEffect(() => {
+    const syncShortlist = () => {
+      try {
+        const user = localStorage.getItem('mtshoots_user');
+        if (!user) {
+          setShortlistIds([]);
+          return;
+        }
+        const saved = localStorage.getItem('capturely_shortlist');
+        setShortlistIds(saved ? JSON.parse(saved) : []);
+      } catch {
+        setShortlistIds([]);
+      }
+    };
+    syncShortlist();
+    window.addEventListener('storage', syncShortlist);
+    window.addEventListener('mtshoots-auth-changed', syncShortlist);
+    return () => {
+      window.removeEventListener('storage', syncShortlist);
+      window.removeEventListener('mtshoots-auth-changed', syncShortlist);
+    };
+  }, []);
 
   const handleToggleShortlist = (id: string) => {
     try {
@@ -566,7 +591,7 @@ export const LandingPage: React.FC = () => {
                   photographer={p}
                   onSelect={() => navigate(`/photographers/${p.id}`)}
                   onQuickBook={() => navigate(`/photographers/${p.id}`)}
-                  isSaved={shortlistIds.includes(p.id)}
+                  isSaved={Boolean(typeof window !== 'undefined' && localStorage.getItem('mtshoots_user') && shortlistIds.includes(p.id))}
                   onToggleSave={handleToggleShortlist}
                 />
               </div>

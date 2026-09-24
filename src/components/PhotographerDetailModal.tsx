@@ -101,6 +101,8 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
     } catch { return false; }
   };
 
+  const isActuallySaved = Boolean(isSaved && isUserSignedIn());
+
   const handleToggleSave = () => {
     if (!isUserSignedIn()) {
       window.location.href = '/auth';
@@ -263,13 +265,13 @@ export const PhotographerDetailModal: React.FC<PhotographerDetailModalProps> = (
               type="button"
               onClick={handleToggleSave}
               className={`p-2 rounded-full border transition-all cursor-pointer ${
-                isSaved
+                isActuallySaved
                   ? 'bg-[#C85A32] text-white border-[#C85A32]'
                   : 'bg-white text-[#181615] border-[#E7E1DA] hover:bg-[#F4EFEB]'
               }`}
-              title={isSaved ? 'Remove from Saved' : 'Save to Shortlist'}
+              title={isActuallySaved ? 'Remove from Saved' : 'Save to Shortlist'}
             >
-              <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+              <Heart className={`w-4 h-4 ${isActuallySaved ? 'fill-current' : ''}`} />
             </button>
             <button
               id="close-photographer-modal-btn"

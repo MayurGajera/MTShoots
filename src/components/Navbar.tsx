@@ -468,6 +468,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleSignOut = () => {
     try {
       localStorage.removeItem('mtshoots_user');
+      localStorage.removeItem('capturely_shortlist');
       setUser(null);
       window.dispatchEvent(new CustomEvent('mtshoots-auth-changed'));
     } catch {}

@@ -73,14 +73,39 @@ export const PhotographersPage: React.FC = () => {
     } catch { return []; }
   });
 
-  // Shortlist
+  // Shortlist (only available when signed in)
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => {
     try {
       if (typeof window === 'undefined') return [];
+      const user = localStorage.getItem('mtshoots_user');
+      if (!user) return [];
       const saved = localStorage.getItem('capturely_shortlist');
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
+
+  useEffect(() => {
+    const syncShortlist = () => {
+      try {
+        const user = localStorage.getItem('mtshoots_user');
+        if (!user) {
+          setShortlistIds([]);
+          return;
+        }
+        const saved = localStorage.getItem('capturely_shortlist');
+        setShortlistIds(saved ? JSON.parse(saved) : []);
+      } catch {
+        setShortlistIds([]);
+      }
+    };
+    syncShortlist();
+    window.addEventListener('storage', syncShortlist);
+    window.addEventListener('mtshoots-auth-changed', syncShortlist);
+    return () => {
+      window.removeEventListener('storage', syncShortlist);
+      window.removeEventListener('mtshoots-auth-changed', syncShortlist);
+    };
+  }, []);
 
   // UI state
   const [selectedPhotographer, setSelectedPhotographer] = useState<Photographer | null>(null);
@@ -459,7 +484,7 @@ export const PhotographersPage: React.FC = () => {
                 photographer={photographer}
                 onSelect={() => setSelectedPhotographer(photographer)}
                 onQuickBook={() => handleQuickBook(photographer)}
-                isSaved={shortlistIds.includes(photographer.id)}
+                isSaved={Boolean(isUserSignedIn() && shortlistIds.includes(photographer.id))}
                 onToggleSave={() => handleToggleShortlist(photographer.id)}
                 targetDate={targetDate}
               />
@@ -475,7 +500,7 @@ export const PhotographersPage: React.FC = () => {
           photographer={selectedPhotographer}
           onClose={() => setSelectedPhotographer(null)}
           onStartBooking={handleStartBookingFromDetail}
-          isSaved={shortlistIds.includes(selectedPhotographer.id)}
+          isSaved={Boolean(isUserSignedIn() && shortlistIds.includes(selectedPhotographer.id))}
           onToggleSave={() => handleToggleShortlist(selectedPhotographer.id)}
           onOpenLightbox={(item) => setLightboxItem(item)}
         />

@@ -572,7 +572,7 @@ export const PhotographerProfilePage: React.FC<PhotographerProfilePageProps> = (
     );
   }
 
-  const isSaved = photographer ? (shortlistIds || []).includes(photographer.id) : false;
+  const isSaved = Boolean(isUserSignedIn() && photographer && (shortlistIds || []).includes(photographer.id));
 
   // Pricing calculations with defensive fallbacks
   const effectiveDayRate = photographer?.dayRate || 25000;
