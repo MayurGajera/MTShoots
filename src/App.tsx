@@ -11,6 +11,7 @@ import { TermsPage } from './pages/TermsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { CancellationPage } from './pages/CancellationPage';
 import { PhotographerApplyPage } from './pages/PhotographerApplyPage';
+import { PhotographerDashboardPage } from './pages/PhotographerDashboardPage';
 import { PwaNav } from './components/PwaNav';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { BookingSheetModal } from './components/BookingSheetModal';
@@ -59,6 +60,7 @@ function AnimatedRoutes({
           <Route path="/" element={<LandingPage />} />
           <Route path="/photographers" element={<PhotographersPage />} />
           <Route path="/photographers/apply" element={<PhotographerApplyPage />} />
+          <Route path="/photographers/dashboard" element={<PhotographerDashboardPage />} />
           <Route path="/photographers/:id" element={
             <PhotographerProfilePage
               onOpenBooking={onOpenBooking}

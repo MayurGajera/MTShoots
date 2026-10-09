@@ -665,9 +665,38 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
       // 1. Immediately persist locally so the newly published artist is accessible in directory
       saveRegisteredPhotographer(photographerProfile);
 
-      // Make sure user is NOT logged in automatically and header remains guest view
-      localStorage.removeItem('mtshoots_user');
-      localStorage.removeItem('mtshoots_photographer_profile');
+      // Log the user in automatically after creating their account
+      const userObject = {
+        id: 'usr-' + Date.now(),
+        fullName: brandName || fullName,
+        email: email.trim().toLowerCase(),
+        role: 'photographer',
+        city: city,
+        avatar: avatarUrl
+      };
+      
+      try {
+        localStorage.setItem('mtshoots_user', JSON.stringify(userObject));
+      } catch (err) {
+        userObject.avatar = '';
+        try {
+          localStorage.setItem('mtshoots_user', JSON.stringify(userObject));
+        } catch (e) {
+          console.warn('Storage limit exceeded, cannot save local session.');
+        }
+      }
+
+      try {
+         localStorage.setItem('mtshoots_photographer_profile', JSON.stringify(photographerProfile));
+      } catch(e) {
+         // Omit large images on storage quota error
+         const safeProfile = { ...photographerProfile, avatar: '', heroImage: '', coverImage: '', homeSliderPhotos: [] };
+         try {
+            localStorage.setItem('mtshoots_photographer_profile', JSON.stringify(safeProfile));
+         } catch(err) {}
+      }
+
+      window.dispatchEvent(new CustomEvent('mtshoots-auth-changed'));
 
       // 2. Persist to Supabase DB with a safety timeout race so it never blocks or hangs
       try {
@@ -697,13 +726,15 @@ export const PhotographerWizard: React.FC<PhotographerWizardProps> = ({
       window.dispatchEvent(new CustomEvent('photographers-updated'));
       setPublishedSlug(uniqueSlug);
 
-      // Smooth loading transition before showing Coming Soon
-      await new Promise(r => setTimeout(r, 600));
-
-      setIsSubmittedComingSoon(true);
+      if (onSuccessRedirect) {
+        onSuccessRedirect(uniqueSlug);
+      } else {
+        navigate('/photographers/dashboard');
+      }
     } catch (err: any) {
       console.error('Publish photographer error:', err);
-      setIsSubmittedComingSoon(true);
+      // Fallback redirect just in case
+      navigate('/photographers/dashboard');
     } finally {
       setIsPublishing(false);
     }

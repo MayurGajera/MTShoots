@@ -379,7 +379,16 @@ export const Navbar: React.FC<NavbarProps> = ({
       avatar: settingsAvatar || ''
     };
     setUser(updated);
-    localStorage.setItem('mtshoots_user', JSON.stringify(updated));
+    try {
+      localStorage.setItem('mtshoots_user', JSON.stringify(updated));
+    } catch (e) {
+      updated.avatar = '';
+      try {
+        localStorage.setItem('mtshoots_user', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Storage limit exceeded, cannot save user profile.');
+      }
+    }
     window.dispatchEvent(new CustomEvent('mtshoots-auth-changed'));
 
     try {
@@ -418,7 +427,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             lenses: settingsLenses.split(',').map(s => s.trim()).filter(Boolean)
           }
         };
-        localStorage.setItem('mtshoots_photographer_profile', JSON.stringify(updatedPhotographer));
+        try {
+          localStorage.setItem('mtshoots_photographer_profile', JSON.stringify(updatedPhotographer));
+        } catch (e) {
+          updatedPhotographer.avatar = '';
+          try {
+            localStorage.setItem('mtshoots_photographer_profile', JSON.stringify(updatedPhotographer));
+          } catch (err) {
+            console.warn('Storage limit exceeded, cannot save photographer profile.');
+          }
+        }
         window.dispatchEvent(new CustomEvent('photographers-updated'));
         try {
           await savePhotographerToSupabase(updatedPhotographer);
@@ -498,6 +516,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     }`;
 
   const hasUserAvatar = Boolean(user?.avatar && user.avatar.trim());
+  const isDashboardPage = location.pathname === '/photographers/dashboard';
 
   return (
   <>
@@ -523,8 +542,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {/* Desktop Nav Links */}
-            <nav className="hidden md:flex items-center space-x-1">
-              <Link to="/photographers" className={navLinkClass('/photographers')}>
+            {!isDashboardPage && (
+              <nav className="hidden md:flex items-center space-x-1">
+                <Link to="/photographers" className={navLinkClass('/photographers')}>
                 <Camera className="w-3.5 h-3.5 shrink-0" />
                 <span>Photographers</span>
               </Link>
@@ -567,6 +587,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </>
               )}
             </nav>
+            )}
 
             {/* Auth / Profile Hub */}
             {user ? (
@@ -643,13 +664,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                       {/* Dropdown Options */}
                       <div className="space-y-0.5 pt-1">
-                        <button
-                          onClick={handleOpenSettings}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[#57423b] hover:text-[#181615] hover:bg-[#FAF8F5] rounded-xl transition-colors cursor-pointer text-left"
-                        >
-                          <Settings className="w-3.5 h-3.5 text-[#C85A32]" />
-                          <span>Account Settings</span>
-                        </button>
+                        {!isDashboardPage && (
+                          <>
+                            <button
+                              onClick={handleOpenSettings}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[#57423b] hover:text-[#181615] hover:bg-[#FAF8F5] rounded-xl transition-colors cursor-pointer text-left"
+                            >
+                              <Settings className="w-3.5 h-3.5 text-[#C85A32]" />
+                              <span>Account Settings</span>
+                            </button>
 
                         <button
                           onClick={handleOpenPasswordModal}
@@ -669,6 +692,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </Link>
 
                         <div className="my-1 border-t border-[#E7E1DA]" />
+                        </>
+                        )}
 
                         <button
                           onClick={handleSignOut}
@@ -735,19 +760,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <div className="text-xs text-[#8a726a] truncate mt-0.5">{user.email}</div>
                     </div>
                   </div>
-                  <button
-                    onClick={handleOpenSettings}
-                    className="text-xs text-[#C85A32] hover:text-[#b04a25] font-semibold px-2.5 py-1 rounded-lg hover:bg-white transition-colors cursor-pointer shrink-0"
-                  >
-                    Edit
-                  </button>
+                  {!isDashboardPage && (
+                    <button
+                      onClick={handleOpenSettings}
+                      className="text-xs text-[#C85A32] hover:text-[#b04a25] font-semibold px-2.5 py-1 rounded-lg hover:bg-white transition-colors cursor-pointer shrink-0"
+                    >
+                      Edit
+                    </button>
+                  )}
                 </div>
               )}
 
               {/* Left-aligned navigation items with consistent icons and spacing */}
-              <div className="flex flex-col gap-1 py-1">
-                <Link
-                  to="/photographers"
+              {!isDashboardPage && (
+                <div className="flex flex-col gap-1 py-1">
+                  <Link
+                    to="/photographers"
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-[#181615] hover:bg-[#FAF8F5] transition-colors"
                 >
@@ -806,6 +834,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span className="flex-1 text-left">Join as Photographer</span>
                 </Link>
               </div>
+              )}
 
               <div className="pt-2 border-t border-[#E7E1DA]">
                 {user ? (
