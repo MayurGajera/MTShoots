@@ -52,3 +52,5 @@ export const PhotographerDashboardPage: React.FC = () => {
     </div>
   );
 };
+
+export default PhotographerDashboardPage;
