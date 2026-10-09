@@ -175,7 +175,19 @@ export const AuthPage: React.FC = () => {
         };
 
         accounts.push(newAccount);
-        localStorage.setItem('mtshoots_accounts', JSON.stringify(accounts));
+        try {
+          localStorage.setItem('mtshoots_accounts', JSON.stringify(accounts));
+        } catch (storageErr) {
+          // If storage quota exceeded, try without avatar
+          newAccount.avatar = '';
+          const fallbackAccounts = readAccounts();
+          fallbackAccounts.push(newAccount);
+          try {
+            localStorage.setItem('mtshoots_accounts', JSON.stringify(fallbackAccounts));
+          } catch (e) {
+            console.warn('Storage limit exceeded, cannot save local account.');
+          }
+        }
 
         const dbUser = await upsertUser({
           email: normalizedEmail,
@@ -222,13 +234,27 @@ export const AuthPage: React.FC = () => {
         avatar: finalAvatar
       };
 
-      localStorage.setItem('mtshoots_user', JSON.stringify(userObject));
+      try {
+        localStorage.setItem('mtshoots_user', JSON.stringify(userObject));
+      } catch (storageErr) {
+        // If storage quota exceeded, omit avatar string
+        userObject.avatar = '';
+        try {
+          localStorage.setItem('mtshoots_user', JSON.stringify(userObject));
+        } catch (e) {
+          console.warn('Storage limit exceeded, cannot save local session.');
+        }
+      }
       window.dispatchEvent(new CustomEvent('mtshoots-auth-changed'));
 
       setSuccess(true);
       setTimeout(() => {
         if (role === 'photographer') {
-          navigate('/photographers/apply');
+          if (mode === 'signup') {
+            navigate('/photographers/apply');
+          } else {
+            navigate('/photographers/dashboard');
+          }
         } else {
           navigate('/photographers');
         }
